@@ -1,0 +1,32 @@
+name: Deploy ClipFlow
+
+on:
+  push:
+    branches: [ main ] # Срабатывает при пуше в ветку main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ~/clipflow
+            git pull origin main
+            
+            # Backend
+            cd server
+            npm install
+            npx prisma generate
+            npx prisma migrate deploy
+            pm2 restart index.js || pm2 start index.js --name "clipflow-api"
+            
+            # Frontend
+            cd ../client
+            npm install
+            npm run build
+            # Копируем билд фронтенда в папку, которую раздает Nginx (если нужно)
