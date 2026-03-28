@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CREATOR
+  UPLOADER
+}
+
+enum TaskStatus {
+  AWAITING_REACTION // Свободна для всех
+  IN_PROGRESS       // Креатор взял в работу
+  REACTION_UPLOADED // Реакция загружена
+  PUBLISHED         // Опубликовано
+  ERROR             // Ошибка
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String   // "ADMIN", "MANAGER", "CREATOR"
+  tasks     Task[]   @relation("CreatorTasks")
+  uploads   Task[]   @relation("UploaderTasks")
+  createdAt DateTime @default(now())
+}
+
+model Channel {
+  id                 Int      @id @default(autoincrement())
+  name               String   @unique
+  titlePrefix        String?  @default("🔥 ЭТО ВЗОРВАЛО СЕТЬ! | ")
+  // Теперь описание разбито на верхнюю часть и нижнюю (disclaimer)
+  descriptionFooter  String?  @default("\n\nHere is my contact email: pleasedontstrike@proton.me\nIf you have any concerns about the content, please reach out before taking any action. I’m sure we can work it out.")
+  tasks              Task[]
+  createdAt          DateTime @default(now())
+}
+
+// Таблица для глобальных настроек (прокси и т.д.)
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique // например, "proxy_url"
+  value String
+}
+
+model OriginalVideo {
+  id            Int      @id @default(autoincrement())
+  videoId       String   @unique
+  url           String   
+  title         String?
+  duration      Int?
+  filePath      String?
+  thumbnailPath String?
+  errorMessage  String?  
+  status        String   @default("DOWNLOADING") 
+  tasks         Task[]
+  createdAt     DateTime @default(now())
+}
+
+model Task {
+  id               Int            @id @default(autoincrement())
+  
+  // Связь с оригиналом
+  originalVideoId  Int            
+  originalVideo    OriginalVideo  @relation(fields: [originalVideoId], references: [id])
+  
+  priority         String         @default("normal")
+  status           TaskStatus     @default(AWAITING_REACTION)
+  
+  // ОТВЕТНАЯ ЧАСТЬ ДЛЯ КРЕАТОРА
+  creatorId        Int?
+  creator          User?          @relation("CreatorTasks", fields: [creatorId], references: [id])
+
+  // ОТВЕТНАЯ ЧАСТЬ ДЛЯ ЗАГРУЗЧИКА (Исправление ошибки!)
+  uploaderId       Int?
+  uploader         User?          @relation("UploaderTasks", fields: [uploaderId], references: [id])
+
+  channelId        Int
+  channel          Channel        @relation(fields: [channelId], references: [id])
+
+  reactionFilePath String?
+  youtubeUrl       String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  title            String?     
+  needsFixing      Boolean @default(false) // Флаг: отправлено на доработку
+  scheduledAt     DateTime? // Время публикации
+  rejectionReason String?
+}
