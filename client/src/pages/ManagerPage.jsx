@@ -1,7 +1,6 @@
 // client/src/pages/ManagerPage.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { API_URL } from '../api';
 import { io } from 'socket.io-client';
 import { 
   Link2, Sparkles, Clock, AlertCircle, CheckCircle2, 
@@ -9,7 +8,7 @@ import {
 } from 'lucide-react';
 import VideoModal from '../components/VideoModal';
 
-const socket = io(API_URL || window.location.origin);
+const socket = io();
 
 export default function ManagerPage() {
   const [url, setUrl] = useState('');
