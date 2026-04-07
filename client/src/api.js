@@ -17,7 +17,6 @@ api.interceptors.request.use(config => {
 
 export const socket = io({
   path: '/socket.io',
-  autoConnect: true
 });
 
 export default api;
