@@ -16,7 +16,6 @@ export default function Layout({ onLogout, user }) {
   const menuItems = [
     { to: "/", icon: <LayoutDashboard size={20} />, label: "Дашборд", roles: ['ADMIN', 'MANAGER', 'CREATOR'] },
     { to: "/manager", icon: <Settings size={20} />, label: "Менеджер", roles: ['ADMIN', 'MANAGER'] },
-    { to: "/uploader", icon: <Upload size={20} />, label: "Загрузчик", roles: ['ADMIN', 'MANAGER'] },
     { to: "/creator", icon: <Video size={20} />, label: "Креатор", roles: ['ADMIN', 'MANAGER', 'CREATOR'] },
     { to: "/admin", icon: <Zap size={20} />, label: "Админ", roles: ['ADMIN'] },
   ];
@@ -27,24 +26,20 @@ export default function Layout({ onLogout, user }) {
     <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1c] text-slate-900 dark:text-slate-100 transition-colors duration-300 flex flex-col lg:flex-row font-['Inter']">
       
       {/* --- MOBILE HEADER --- */}
-      <header className="lg:hidden flex items-center justify-between p-4 bg-white dark:bg-[#1a1f2e] border-b dark:border-slate-800 sticky top-0 z-50">
-        {/* 1. Кнопка меню СЛЕВА */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-[64px] flex items-center justify-between p-4 bg-white/90 dark:bg-[#1a1f2e]/90 backdrop-blur-md border-b dark:border-slate-800 z-[100]">
         <button 
           onClick={() => setIsMenuOpen(true)}
-          className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-90 transition-all border border-slate-100 dark:border-slate-700"
+          className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
         >
           <Menu size={24} />
         </button>
 
-        {/* 2. Логотип ПО ЦЕНТРУ */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Zap size={18} className="text-white" fill="currentColor" />
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Zap size={16} className="text-white" fill="currentColor" />
           </div>
-          <h1 className="text-lg font-bold tracking-tight uppercase text-slate-900 dark:text-white">ClipFlow</h1>
+          <h1 className="text-lg font-bold tracking-tight uppercase">Clipsio</h1>
         </div>
-
-        {/* 3. Пустой блок для симметрии (или можешь сюда перенести Sun/Moon) */}
         <div className="w-10"></div> 
       </header>
 
@@ -64,7 +59,7 @@ export default function Layout({ onLogout, user }) {
               <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                 <Zap size={22} className="text-white" fill="currentColor" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">ClipFlow</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">Clipsio</h1>
             </div>
             <button onClick={() => setIsMenuOpen(false)} className="lg:hidden p-2 text-slate-400"><X size={24} /></button>
           </div>
@@ -122,7 +117,7 @@ export default function Layout({ onLogout, user }) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 pt-[64px] lg:pt-0"> 
         <div className="p-4 md:p-8 lg:p-10 max-w-6xl mx-auto w-full">
           <Outlet />
         </div>

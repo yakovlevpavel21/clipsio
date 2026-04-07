@@ -32,17 +32,23 @@ model User {
   username  String   @unique
   password  String
   role      String   // "ADMIN", "MANAGER", "CREATOR"
-  tasks     Task[]   @relation("CreatorTasks")
-  uploads   Task[]   @relation("UploaderTasks")
-  createdAt DateTime @default(now())
+  tgUsername String?
+  lastActive DateTime?
+  
+  // Отношения
+  tasks      Task[]   @relation("CreatorTasks")
+  uploads    Task[]   @relation("UploaderTasks")
+  managed    Task[]   @relation("ManagerTasks") // Задачи, созданные этим менеджером
+  createdAt  DateTime @default(now())
 }
 
 model Channel {
-  id                 Int      @id @default(autoincrement())
-  name               String   @unique
-  titlePrefix        String?  @default("🔥 ЭТО ВЗОРВАЛО СЕТЬ! | ")
-  // Теперь описание разбито на верхнюю часть и нижнюю (disclaimer)
-  descriptionFooter  String?  @default("\n\nHere is my contact email: pleasedontstrike@proton.me\nIf you have any concerns about the content, please reach out before taking any action. I’m sure we can work it out.")
+  id                  Int      @id @default(autoincrement())
+  name                String   @unique
+  titlePrefix         String?  @default("")
+  descriptionFooter   String?  @default("")
+  showOriginalLink    Boolean  @default(true)
+  originalLinkPrefix  String?  @default("CREDIT - ")
   tasks              Task[]
   createdAt          DateTime @default(now())
 }
@@ -86,16 +92,24 @@ model Task {
   uploaderId       Int?
   uploader         User?          @relation("UploaderTasks", fields: [uploaderId], references: [id])
 
+  managerId        Int?
+  manager          User?          @relation("ManagerTasks", fields: [managerId], references: [id])
+
   channelId        Int
   channel          Channel        @relation(fields: [channelId], references: [id])
 
+  // Таймлайны (Твои новые поля)
+  createdAt        DateTime       @default(now())      // Добавлено в ленту
+  claimedAt        DateTime?                           // Взято в работу
+  reactionUploadedAt DateTime?                         // Реакция готова
+  publishedAt      DateTime?                           // Опубликовано на YouTube
+  deadline         DateTime?                           // Срок (дедлайн)
+
   reactionFilePath String?
   youtubeUrl       String?
-  createdAt        DateTime       @default(now())
+  scheduledAt      DateTime?
+    
+  needsFixing      Boolean        @default(false)
+  rejectionReason  String?
   updatedAt        DateTime       @updatedAt
-  
-  title            String?     
-  needsFixing      Boolean @default(false) // Флаг: отправлено на доработку
-  scheduledAt     DateTime? // Время публикации
-  rejectionReason String?
 }

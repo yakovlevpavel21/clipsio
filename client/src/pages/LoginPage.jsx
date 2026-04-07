@@ -1,6 +1,6 @@
 // client/src/pages/LoginPage.jsx
 import { useState } from 'react';
-import axios from 'axios';
+import axios from '../api';
 import { Zap, Loader2, Lock, User } from 'lucide-react';
 
 export default function LoginPage({ onLogin }) {
@@ -31,7 +31,7 @@ export default function LoginPage({ onLogin }) {
           <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-blue-500/40 mx-auto">
             <Zap size={32} className="text-white" fill="currentColor" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">ClipFlow</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">Clipsio</h1>
           <p className="text-slate-500 font-medium">Войдите в систему управления контентом</p>
         </div>
 
@@ -80,7 +80,7 @@ export default function LoginPage({ onLogin }) {
         </form>
 
         <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] opacity-50">
-          ClipFlow System v1.0
+          Clipsio System v1.0
         </p>
       </div>
     </div>

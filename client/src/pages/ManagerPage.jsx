@@ -1,327 +1,371 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { io } from 'socket.io-client';
+// client/src/pages/ManagerPage.jsx
+import { useState, useEffect, useRef, useMemo } from 'react';
+import axios, { socket } from '../api';
 import { 
-  Link2, Sparkles, Clock, AlertCircle, CheckCircle2, 
-  Loader2, LayoutGrid, Play, Zap, Globe, Search, X 
+  Plus, List, Calendar, X, Loader2, CheckCircle2, 
+  Clock, Send, Zap, Filter, Sparkles, Search 
 } from 'lucide-react';
-import VideoModal from '../components/VideoModal';
-import PageStatus from '../components/PageStatus';
 
-// Настройка сокета для прогресс-бара
-const socket = io({ path: '/socket.io' });
+// Компоненты
+import PageStatus from '../components/PageStatus';
+import TaskCardManager from '../components/TaskCardManager';
+import AddTaskModal from '../components/AddTaskModal';
+import PublishModal from '../components/PublishModal';
+import VideoModal from '../components/VideoModal';
+import EditTaskModal from '../components/EditTaskModal';
 
 export default function ManagerPage() {
-  // Состояния данных
+  // --- СОСТОЯНИЯ ДАННЫХ ---
+  const [tasks, setTasks] = useState([]);
   const [channels, setChannels] = useState([]);
-  const [videoInfo, setVideoInfo] = useState(null);
+  const [creators, setCreators] = useState([]);
+  const [alerts, setAlerts] = useState({ active: false, published: false });
   
-  // Состояния интерфейса
-  const [loading, setLoading] = useState(true);
+  // --- СОСТОЯНИЯ ЗАГРУЗКИ ---
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false); // Для PageStatus
   const [error, setError] = useState(null);
-  const [isChecking, setIsChecking] = useState(false);
-  
-  // Состояния формы
-  const [url, setUrl] = useState('');
-  const [selectedChannels, setSelectedChannels] = useState([]);
-  const [isUrgent, setIsUrgent] = useState(false);
-  const [useProxy, setUseProxy] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
 
-  // 1. Инициализация (загрузка каналов)
+  // --- ФИЛЬТРЫ И ПАГИНАЦИЯ ---
+  const [tab, setTab] = useState('active'); 
+  const [selectedChannel, setSelectedChannel] = useState('all');
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const isFetchingRef = useRef(false);
+  const abortControllerRef = useRef(null);
+  const ITEMS_PER_PAGE = 10;
+
+  // --- МОДАЛЬНЫЕ ОКНА ---
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedTaskForEdit, setSelectedTaskForEdit] = useState(null);
+  const [selectedTaskForPublish, setSelectedTaskForPublish] = useState(null);
+  const [activePreview, setActivePreview] = useState(null);
+
+  // 1. ПЕРВИЧНАЯ И ПОЛНАЯ ЗАГРУЗКА (При смене таба или фильтра)
   const initPage = async () => {
-    setLoading(true);
+    // Отменяем предыдущий запрос, если он еще идет
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    // Блокируем новые запросы подгрузки
+    isFetchingRef.current = true;
+    
+    if (!isInitialLoading) setIsRefreshing(true);
     setError(null);
+    setHasMore(true);
+    setTasks([]); // Очищаем список для "чистого" перехода
+
     try {
-      const res = await axios.get('/api/channels');
-      setChannels(res.data);
+      const url = `/api/tasks/managed?skip=0&take=${ITEMS_PER_PAGE}&tab=${tab}&channelId=${selectedChannel}`;
+      
+      const [tasksRes, chanRes, creatorsRes, alertsRes] = await Promise.all([
+        axios.get(url, { signal: abortControllerRef.current.signal }),
+        axios.get('/api/channels', { signal: abortControllerRef.current.signal }),
+        axios.get('/api/tasks/creators', { signal: abortControllerRef.current.signal }),
+        axios.get('/api/tasks/alerts-status', { signal: abortControllerRef.current.signal })
+      ]);
+
+      setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : []);
+      setChannels(Array.isArray(chanRes.data) ? chanRes.data : []);
+      setCreators(Array.isArray(creatorsRes.data) ? creatorsRes.data : []);
+      setAlerts(alertsRes.data || { active: false, published: false });
+      
+      setHasMore(tasksRes.data.length === ITEMS_PER_PAGE);
     } catch (err) {
-      setError("Не удалось загрузить список каналов");
+      if (axios.isCancel(err)) return;
+      console.error("Fetch error:", err);
+      setError("Не удалось загрузить данные сервера");
     } finally {
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
       setLoading(false);
+      isFetchingRef.current = false; // Снимаем блок
     }
   };
 
-  useEffect(() => { initPage(); }, []);
-
-  // 2. Слушатель прогресса (Socket.io)
   useEffect(() => {
-    socket.on('downloadProgress', (data) => {
-      if (videoInfo && data.videoId === videoInfo.videoId) {
-        if (data.status === 'DOWNLOADING') setDownloadProgress(data.progress);
-        if (data.status === 'READY' || data.status === 'ERROR') handleCheckVideo(); 
-      }
-    });
-    return () => socket.off('downloadProgress');
-  }, [videoInfo?.videoId]);
+    initPage();
+  }, [tab, selectedChannel]);
 
-  // Если страница еще грузит каналы или упала с ошибкой
-  if (loading || error) {
-    return <PageStatus loading={loading} error={error} onRetry={initPage} />;
+  // 2. ПОДГРУЗКА ДАННЫХ ПРИ СКРОЛЛЕ
+  const fetchMoreTasks = async () => {
+    // ЗАЩИТА 1: Если уже грузим, если сброс, если данных нет, или если список пуст — ВЫХОДИМ
+    if (isFetchingRef.current || !hasMore || isRefreshing || tasks.length === 0) return;
+    
+    isFetchingRef.current = true;
+    setIsFetchingMore(true);
+
+    try {
+      const currentLength = tasks.length;
+      const url = `/api/tasks/managed?skip=${currentLength}&take=${ITEMS_PER_PAGE}&tab=${tab}&channelId=${selectedChannel}`;
+      
+      const res = await axios.get(url);
+      const newTasks = res.data;
+
+      // ЗАЩИТА 2: Если пришел пустой массив или меньше лимита — отключаем пагинацию навсегда для этого таба
+      if (!newTasks || newTasks.length === 0) {
+        setHasMore(false);
+        isFetchingRef.current = false; // Разблокируем, но так как hasMore false, больше не зайдем
+        setIsFetchingMore(false);
+        return;
+      }
+
+      if (newTasks.length < ITEMS_PER_PAGE) {
+        setHasMore(false);
+      }
+
+      setTasks(prev => {
+        const existingIds = new Set(prev.map(t => t.id));
+        const uniqueNew = newTasks.filter(t => !existingIds.has(t.id));
+        return [...prev, ...uniqueNew];
+      });
+
+    } catch (err) {
+      console.error("Ошибка подгрузки:", err);
+    } finally {
+      isFetchingRef.current = false;
+      setIsFetchingMore(false);
+    }
+  };
+
+  // 3. УДАЛЕНИЕ ЗАДАЧИ
+  const handleDeleteTask = async (id) => {
+    if (!window.confirm("Удалить задачу безвозвратно?")) return;
+    try {
+      await axios.delete(`/api/tasks/${id}`);
+      // Локально удаляем из списка, чтобы не перезагружать всё
+      setTasks(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      alert("Ошибка при удалении");
+    }
+  };
+
+  // 4. ОПТИМИЗИРОВАННАЯ ГРУППИРОВКА (useMemo)
+  const groupedTasks = useMemo(() => {
+    const groups = {};
+    tasks.forEach(task => {
+      const date = new Date(task.createdAt).toLocaleDateString('ru-RU', {
+        weekday: 'long', day: 'numeric', month: 'long'
+      });
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(task);
+    });
+    return groups;
+  }, [tasks]);
+
+  // 5. ПРЕДПРОСМОТР ВИДЕО
+  const handleOpenPreview = (task, type = 'original') => {
+    const url = type === 'original' 
+      ? `/${task.originalVideo.filePath}`
+      : `/${task.reactionFilePath}`;
+    setActivePreview({ url, title: task.originalVideo.title, channel: task.channel.name });
+  };
+
+  // --- РЕНДЕР СОСТОЯНИЙ ЗАГРУЗКИ ---
+  if (isInitialLoading) {
+    return <PageStatus loading={true} error={error} onRetry={initPage} />;
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-24 px-4 font-['Inter']">
+    <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">
+      
+      {/* HEADER */}
       <header className="pt-10 mb-8 px-1 animate-in fade-in duration-700">
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight text-left">
-          Добавить контент
-        </h1>
-        <p className="text-sm md:text-base text-slate-500 font-medium mt-2">
-          Вставьте ссылку на видео, чтобы поставить задачу в очередь креаторам.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Управление контентом
+            </h1>
+            <p className="text-sm text-slate-500 font-medium leading-relaxed min-h-[40px] flex items-center">
+              {tab === 'active' && "Контролируйте процесс создания: от ленты до готовых реакций."}
+              {tab === 'published' && "Архив опубликованных видео и статистика их размещения."}
+            </p>
+          </div>
+          
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-95 shrink-0"
+          >
+            <Plus size={18} /> Добавить видео
+          </button>
+        </div>
       </header>
 
-      <div className="space-y-5">
-        
-        {/* INPUT CARD */}
-        <div className="bg-white dark:bg-[#1a1f2e] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <div className="relative">
-                <input type="checkbox" className="sr-only peer" checked={useProxy} onChange={() => setUseProxy(!useProxy)} />
-                <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-blue-600 transition-all"></div>
-                <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full peer-checked:translate-x-4 transition-all"></div>
-              </div>
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Использовать Proxy</span>
-            </label>
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-3">
-            <input 
-              className="flex-1 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-medium outline-none focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Вставьте ссылку на YouTube..."
-            />
-            <button 
-              onClick={handleCheckVideo}
-              disabled={isChecking || !url}
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
-            >
-              {isChecking ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-              Проверить видео
-            </button>
-          </div>
+      {/* STICKY NAVIGATION & FILTERS */}
+      <div className="sticky top-0 lg:top-0 max-lg:top-[64px] z-40 bg-slate-50 dark:bg-[#0a0f1c] -mx-4 px-4 pt-4 pb-4 border-b dark:border-slate-800 transition-all">
+        <div className="flex bg-slate-200/50 dark:bg-slate-900 p-1.5 rounded-2xl gap-1 mb-5 shadow-inner">
+          <TabBtn 
+            label="В очереди" 
+            active={tab === 'active'} 
+            onClick={() => setTab('active')} 
+            loading={isRefreshing && tab === 'active'}
+            hasBadge={alerts.active} 
+          />
+          <TabBtn 
+            label="Опубликовано" 
+            active={tab === 'published'} 
+            onClick={() => setTab('published')} 
+            loading={isRefreshing && tab === 'published'}
+          />
         </div>
 
-        {/* RESULT AREA */}
-        {videoInfo && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 space-y-4">
-            
-            {/* DOWNLOADING */}
-            {videoInfo.status === 'DOWNLOADING' && (
-              <div className="bg-white dark:bg-[#1a1f2e] p-6 rounded-2xl border border-blue-500/20 text-center space-y-4">
-                <Loader2 className="animate-spin text-blue-500 mx-auto" size={32} />
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Загрузка на сервер</p>
-                  <p className="text-xl font-bold text-blue-600 tabular-nums">{downloadProgress.toFixed(1)}%</p>
-                </div>
-                <div className="w-full max-w-xs mx-auto bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
-                </div>
-              </div>
-            )}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+          <FilterBtn 
+            label="Все каналы" 
+            active={selectedChannel === 'all'} 
+            onClick={() => setSelectedChannel('all')} 
+          />
+          {channels.map(ch => (
+            <FilterBtn 
+              key={ch.id} 
+              label={ch.name} 
+              active={selectedChannel === ch.id} 
+              onClick={() => setSelectedChannel(ch.id)} 
+            />
+          ))}
+        </div>
+      </div>
 
-            {/* ERROR / TOO LONG */}
-            {(videoInfo.status === 'ERROR' || videoInfo.status === 'TOO_LONG') && (
-              <div className="bg-white dark:bg-[#1a1f2e] p-6 rounded-2xl border border-red-500/20 flex flex-col items-center text-center space-y-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${videoInfo.status === 'TOO_LONG' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'}`}>
-                  <AlertCircle size={24} />
-                </div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-                   {videoInfo.status === 'TOO_LONG' ? 'Видео отклонено' : 'Ошибка обработки'}
-                </p>
-                <p className="text-xs text-slate-500 max-w-xs leading-relaxed">{videoInfo.errorMessage}</p>
-                <button onClick={() => { setUrl(''); setVideoInfo(null); }} className="text-blue-500 font-bold text-[10px] uppercase underline tracking-widest">Сбросить</button>
-              </div>
-            )}
-
-            {/* READY */}
-            {videoInfo.status === 'READY' && (
-              <div className="space-y-4">
-                {/* Horizontal Card Preview */}
-                <div className="bg-white dark:bg-[#1a1f2e] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-center">
-                  <div 
-                    onClick={() => setActivePreview({ url: `/${videoInfo.filePath}`, title: videoInfo.title })}
-                    className="relative w-full sm:w-44 aspect-video rounded-xl overflow-hidden bg-black shrink-0 cursor-pointer group"
-                  >
-                    <img src={`/${videoInfo.thumbnailPath}`} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" alt="thumb" />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                      <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
-                        <Play fill="white" size={16} />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0 text-center sm:text-left py-1 px-2">
-                    <div className="flex items-center justify-center sm:justify-start gap-2 mb-1.5">
-                       <span className="text-[9px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-100 dark:border-emerald-800 px-1.5 py-0.5 rounded uppercase">Ready</span>
-                       <span className="text-[10px] text-slate-400 font-medium tracking-wide flex items-center gap-1">
-                         <Clock size={12} /> {formatDuration(videoInfo.duration)}
-                       </span>
-                    </div>
-                    <h3 className="text-sm md:text-base font-semibold text-slate-900 dark:text-white leading-tight mb-1 line-clamp-2 break-words uppercase">
-                      {videoInfo.title}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest opacity-60">ID: {videoInfo.videoId}</p>
-                  </div>
-                </div>
-
-                {/* TASK SETUP */}
-                <div className="bg-white dark:bg-[#1a1f2e] p-5 md:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-8 shadow-sm">
-                  
-                  {/* Channels Selection */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <LayoutGrid size={14}/> Назначить на каналы
-                      </label>
-                      <div className="flex gap-4">
-                        <button onClick={() => setSelectedChannels(channels.map(c => c.id))} className="text-[10px] font-bold text-blue-500 uppercase hover:text-blue-600">Все</button>
-                        <button onClick={() => setSelectedChannels([])} className="text-[10px] font-bold text-slate-400 uppercase hover:text-red-500">Сброс</button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-                      {channels.map(ch => {
-                        const isSelected = selectedChannels.includes(ch.id);
-                        
-                        // ПРОВЕРКА НА ДУБЛИКАТ
-                        const isDuplicate = videoInfo.existingChannelIds?.includes(ch.id);
-
-                        return (
-                          <button 
-                            key={ch.id} 
-                            onClick={() => setSelectedChannels(prev => isSelected ? prev.filter(id => id !== ch.id) : [...prev, ch.id])}
-                            className={`px-4 py-2 rounded-xl text-[11px] font-bold transition-all border relative
-                              ${isSelected 
-                                ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
-                                : isDuplicate
-                                  ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-600'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-400'}
-                            `}
-                          >
-                            {ch.name}
-                            {isDuplicate && !isSelected && (
-                              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-[#1a1f2e]" title="Это видео уже есть на этом канале" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* ТЕКСТОВОЕ ПРЕДУПРЕЖДЕНИЕ */}
-                    {selectedChannels.some(id => videoInfo.existingChannelIds?.includes(id)) && (
-                      <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-xl mt-4">
-                        <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                        <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium leading-relaxed">
-                          <span className="font-bold uppercase block mb-1">Внимание: Дубликат</span>
-                          Вы выбрали каналы, на которые это видео уже добавлялось ранее. Убедитесь, что это не ошибка.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Priority Toggle & Submit */}
-                  <div className="flex flex-col gap-4 border-t dark:border-slate-800 pt-8">
-                    
-                    <label className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800 cursor-pointer transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
-                      <div className="flex items-center gap-3">
-                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isUrgent ? 'bg-red-500 border-red-500' : 'border-slate-300 dark:border-slate-600'}`}>
-                           {isUrgent && <CheckCircle2 size={12} className="text-white" strokeWidth={3} />}
-                         </div>
-                         <div className="flex flex-col">
-                            <span className={`text-[13px] font-bold uppercase tracking-tight ${isUrgent ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'}`}>Приоритет: Срочно 🔥</span>
-                            <span className="text-[10px] text-slate-400 font-medium">Задача будет поднята в начало ленты</span>
-                         </div>
-                      </div>
-                      <input type="checkbox" className="hidden" checked={isUrgent} onChange={() => setIsUrgent(!isUrgent)} />
-                    </label>
-
-                    <button 
-                      onClick={handleSubmit}
-                      disabled={selectedChannels.length === 0}
-                      className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-90 disabled:opacity-20 transition-all shadow-xl"
-                    >
-                      Поставить в очередь ({selectedChannels.length})
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+      {/* --- LIST CONTENT --- */}
+      <div className={`mt-8 space-y-12 transition-all duration-300 ${isRefreshing ? 'opacity-0' : 'opacity-100'}`}>
+        {tasks.length === 0 && !isRefreshing ? (
+          <div className="py-24 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem]">
+            <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest opacity-50">Задач не найдено</p>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Группировка и отрисовка */}
+            {Object.keys(groupedTasks).map(date => (
+              <div key={date} className="space-y-5">
+                <div className="flex items-center gap-4 px-2 opacity-60">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400 whitespace-nowrap">{date}</span>
+                  <div className="h-px bg-slate-200 dark:bg-slate-800 w-full" />
+                </div>
+                <div className="space-y-4">
+                  {groupedTasks[date].map(task => (
+                    <TaskCardManager 
+                      key={task.id} 
+                      task={task} 
+                      onPreview={handleOpenPreview}
+                      onPublish={() => setSelectedTaskForPublish(task)}
+                      onEdit={(t) => { setSelectedTaskForEdit(t); setIsEditModalOpen(true); }}
+                      onDelete={handleDeleteTask}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
 
-        {/* SUCCESS ALERT */}
-        {status === 'success' && (
-          <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-800 animate-in zoom-in-95">
-            <CheckCircle2 size={24} />
-            <span className="font-bold uppercase text-xs tracking-widest">Задачи успешно поставлены в работу</span>
-          </div>
+            {/* БЛОК ПОДГРУЗКИ */}
+            <div className="pt-10 pb-20 flex flex-col items-center justify-center">
+              {hasMore ? (
+                <div 
+                  ref={(el) => {
+                    // ЗАЩИТА 3: Если лоадер появился, но мы уже грузим или данных нет — игнорируем
+                    if (!el || isFetchingRef.current || !hasMore || isRefreshing) return;
+
+                    const observer = new IntersectionObserver((entries) => {
+                      if (entries[0].isIntersecting) {
+                        // Как только увидели лоадер — СРАЗУ отключаем этот наблюдатель
+                        observer.unobserve(el);
+                        fetchMoreTasks();
+                      }
+                    }, { 
+                      threshold: 0.1, // Срабатывает, как только показался хотя бы край (10%)
+                      rootMargin: '100px' // Начинаем грузить чуть заранее (за 100px до края)
+                    });
+                    observer.observe(el);
+                  }}
+                  className="h-10 flex items-center justify-center"
+                >
+                  <Loader2 className="animate-spin text-blue-500" size={24} />
+                </div>
+              ) : (
+                tasks.length > 0 && (
+                  <div className="flex flex-col items-center gap-2 opacity-20 py-10">
+                    <div className="h-10 w-px bg-slate-400 mb-2" />
+                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-500">
+                      Это всё, что мы нашли
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {activePreview && (
-        <VideoModal 
-          url={activePreview.url}
-          title={activePreview.title}
-          channel="Оригинал"
-          onClose={() => setActivePreview(null)}
+      {/* --- MODALS --- */}
+      {isAddModalOpen && (
+        <AddTaskModal 
+          onClose={() => setIsAddModalOpen(false)} 
+          onSuccess={() => { setIsAddModalOpen(false); initPage(); }} 
+          channels={channels} 
         />
       )}
 
-      {/* --- НОВАЯ СЕКЦИЯ: ОЧЕРЕДЬ В ЛЕНТЕ --- */}
-      <div className="mt-16 space-y-6">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center text-slate-500">
-               <List size={18} />
-             </div>
-             <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight uppercase">Задачи в ленте</h3>
-          </div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
-            {pendingTasks.length} свободных
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          {pendingTasks.length === 0 ? (
-            <div className="py-10 text-center border-2 border-dashed dark:border-slate-800 rounded-2xl text-slate-400 text-xs font-medium uppercase tracking-widest">
-              Лента пуста
-            </div>
-          ) : (
-            pendingTasks.map(task => (
-              <div key={task.id} className="bg-white dark:bg-[#1a1f2e] p-3 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 group">
-                {/* Мини-превью */}
-                <div className="w-16 aspect-video rounded-lg overflow-hidden bg-black shrink-0 shadow-sm border border-black/5">
-                   <img src={`/${task.originalVideo?.thumbnailPath}`} className="w-full h-full object-cover" alt="" />
-                </div>
-
-                {/* Инфо */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[9px] font-bold text-blue-500 uppercase tracking-tighter bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
-                      {task.channel?.name}
-                    </span>
-                    {task.priority === 'urgent' && <span className="text-[9px] font-bold text-red-500 uppercase">Срочно</span>}
-                  </div>
-                  <h4 className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate uppercase leading-tight">
-                    {task.originalVideo?.title}
-                  </h4>
-                </div>
-
-                {/* Кнопка отмены */}
-                <button 
-                  onClick={() => handleDeleteTask(task.id)}
-                  className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
-                  title="Удалить задачу"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      {isEditModalOpen && (
+        <EditTaskModal 
+          task={selectedTaskForEdit} 
+          creators={creators} 
+          onClose={() => setIsEditModalOpen(false)} 
+          onSuccess={() => { setIsEditModalOpen(false); initPage(); }} 
+        />
+      )}
+      
+      {selectedTaskForPublish && (
+        <PublishModal 
+          task={selectedTaskForPublish} 
+          onClose={() => setSelectedTaskForPublish(null)} 
+          onSuccess={() => { setSelectedTaskForPublish(null); initPage(); }} 
+        />
+      )}
+      
+      {activePreview && (
+        <VideoModal {...activePreview} onClose={() => setActivePreview(null)} />
+      )}
     </div>
+  );
+}
+
+// --- ВНУТРЕННИЕ UI КОМПОНЕНТЫ ---
+
+function TabBtn({ label, active, onClick, hasBadge, loading }) {
+  return (
+    <button 
+      onClick={onClick} 
+      disabled={loading} 
+      className={`relative flex-1 h-11 flex items-center justify-center rounded-xl text-[13px] font-bold transition-all ${active ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+    >
+      <div className="relative flex items-center justify-center w-full h-full">
+        {loading ? (
+          <Loader2 className="animate-spin text-blue-600" size={16} strokeWidth={2.5} />
+        ) : (
+          <span className="truncate">{label}</span>
+        )}
+      </div>
+
+      {hasBadge && !loading && (
+        <span className="absolute top-2 right-2 flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 border border-white dark:border-slate-900"></span>
+        </span>
+      )}
+    </button>
+  );
+}
+
+function FilterBtn({ label, active, onClick }) {
+  return (
+    <button 
+      onClick={onClick} 
+      className={`px-5 py-2 rounded-xl text-[12px] font-bold whitespace-nowrap border transition-all ${active ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-white dark:bg-[#1a1f2e] border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-400 dark:hover:border-slate-600'}`}
+    >
+      {label}
+    </button>
   );
 }

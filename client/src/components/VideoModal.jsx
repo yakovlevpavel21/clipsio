@@ -50,15 +50,16 @@ export default function VideoModal({ url, title, channel, onClose }) {
         <div className="relative w-full aspect-video bg-black rounded-2xl md:rounded-[2rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/10">
           <video 
             src={url} 
-            className="w-full h-full object-contain" // object-contain сохранит пропорции внутри 16:9
+            className="w-full h-full object-contain"
             controls 
             autoPlay
+            playsInline // <-- Добавь это
           />
         </div>
 
         {/* ПОДСКАЗКА ВНИЗУ */}
         <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em] opacity-50">
-          ClipFlow Cinema Mode
+          Clipsio Cinema Mode
         </p>
       </div>
     </div>

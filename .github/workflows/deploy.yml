@@ -1,4 +1,4 @@
-name: Deploy ClipFlow
+name: Deploy Clipsio
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd ~/clipflow
+            cd ~/clipsio
             git pull origin main
             
             # Backend
@@ -23,7 +23,7 @@ jobs:
             npm install
             npx prisma generate
             npx prisma migrate deploy
-            pm2 restart index.js || pm2 start index.js --name "clipflow-api"
+            pm2 restart index.js || pm2 start index.js --name "clipsio-api"
             
             # Frontend
             cd ../client

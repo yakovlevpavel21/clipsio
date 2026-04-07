@@ -1,12 +1,13 @@
-import axios from 'axios';
+import axiosLib from 'axios';
+import { io } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+const api = axiosLib.create({
+  baseURL: '',
+});
 
-// Базовая настройка axios
-axios.defaults.baseURL = '';
+api.isCancel = axiosLib.isCancel;
 
-// Автоматическая подстановка токена
-axios.interceptors.request.use(config => {
+api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -14,4 +15,9 @@ axios.interceptors.request.use(config => {
   return config;
 });
 
-export { API_URL };
+export const socket = io({
+  path: '/socket.io',
+  autoConnect: true
+});
+
+export default api;

@@ -29,14 +29,22 @@ export default function UploadModal({ task, onClose, onSuccess }) {
 
   const handleFinalUpload = async () => {
     if (!selectedFile) return;
+    
     setLoading(true);
     const formData = new FormData();
     formData.append('video', selectedFile);
+    
     try {
-      await axios.post(`/api/tasks/${task.id}/upload`, formData);
+      const res = await axios.post(`/api/tasks/${task.id}/upload`, formData);
+      
+      if (res.data.tgWarning) {
+        alert(`⚠️ ${res.data.tgWarning}`);
+      }
+
       onSuccess();
     } catch (err) {
-      alert("Ошибка при загрузке");
+      console.error(err);
+      alert(err.response?.data?.error || "Ошибка при загрузке файла");
       setLoading(false);
     }
   };
@@ -81,6 +89,7 @@ export default function UploadModal({ task, onClose, onSuccess }) {
                 className="w-full h-full object-contain" 
                 controls
                 preload="metadata"
+                playsInline
               />
             </div>
             <p className="text-[11px] font-medium text-slate-500 px-1 truncate">
@@ -118,13 +127,18 @@ export default function UploadModal({ task, onClose, onSuccess }) {
             ) : (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                 <div className="relative aspect-video rounded-2xl overflow-hidden bg-black border-2 border-blue-500/20 shadow-xl">
-                  <video src={previewUrl} controls className="w-full h-full object-contain" />
+                  <video 
+                    src={previewUrl} 
+                    controls 
+                    className="w-full h-full object-contain"
+                    playsInline
+                  />
                 </div>
 
                 {loading ? (
                   <div className="flex flex-col items-center py-2 gap-2">
                     <Loader2 className="animate-spin text-blue-500" size={32} />
-                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Отправка в ClipFlow...</p>
+                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Отправка в Clipsio...</p>
                   </div>
                 ) : (
                   <div className="flex gap-2">
