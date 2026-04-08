@@ -184,6 +184,21 @@ module.exports = (io) => {
   });
 
   // --- ДЕЙСТВИЯ С ЗАДАЧАМИ ---
+
+  router.get('/download-file', protect, (req, res) => {
+    const filePath = req.query.path; // получаем путь из параметров
+    if (!filePath) return res.status(400).send("Path is required");
+
+    const fullPath = path.join(__dirname, '../../', filePath);
+    
+    if (fs.existsSync(fullPath)) {
+      // res.download принудительно заставляет браузер именно СКАЧИВАТЬ файл
+      res.download(fullPath); 
+    } else {
+      res.status(404).send("File not found");
+    }
+  });
+
   router.post('/:id/claim', protect, async (req, res) => {
     const task = await prisma.task.update({
       where: { id: parseInt(req.params.id) },
