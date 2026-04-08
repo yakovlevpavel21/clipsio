@@ -1,5 +1,5 @@
 // client/src/components/Layout.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Upload, Settings, 
