@@ -9,6 +9,7 @@ const prisma = require('../db');
 const { protect, authorize } = require('../auth');
 const { downloadVideoBackground } = require('../downloader');
 const { sendToGroup, queueNotification } = require('../telegram');
+const { sendPushNotification } = require('../push');
 
 const execPromise = util.promisify(exec);
 const upload = multer({ dest: 'uploads/' });
@@ -85,6 +86,7 @@ module.exports = (io) => {
   // --- СОЗДАНИЕ ЗАДАЧ (BULK) ---
   router.post('/bulk', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
     const { originalVideoId, tasks } = req.body;
+    
     try {
       const createdTasks = await Promise.all(tasks.map(async (t) => {
         return prisma.task.create({
@@ -96,28 +98,45 @@ module.exports = (io) => {
             status: t.creatorId ? 'IN_PROGRESS' : 'AWAITING_REACTION',
             claimedAt: t.creatorId ? new Date() : null,
             deadline: t.deadline ? new Date(t.deadline) : null,
-            scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null,
+            scheduledAt: t.scheduledAt ? new Date(scheduledAt) : null,
           },
           include: { channel: true, creator: true, originalVideo: true }
         });
       }));
+      
+      // 1. Уведомляем тех, кому назначили задачу персонально
+      const assignedTasks = createdTasks.filter(t => t.creatorId);
+      
+      for (const task of assignedTasks) {
+        await sendPushNotification(task.creatorId, {
+          title: "Персональное задание!",
+          message: `Вам назначено видео на канале ${task.channel.name}`,
+          url: "/creator"
+        });
+      }
 
-      // Сводка для Telegram через буфер
-      const videoTitle = createdTasks[0]?.originalVideo?.title || "Новое видео";
-      const taskInfo = {
-        manager: req.user.username,
-        videoTitle: videoTitle,
-        assigned: createdTasks.filter(t => t.creatorId).map(t => ({
-          tag: t.creator?.tgUsername ? `@${t.creator.tgUsername}` : t.creator?.username,
-          channel: t.channel.name,
-          deadline: t.deadline ? new Date(t.deadline).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }).replace('.', '') : 'нет'
-        })),
-        toFeed: createdTasks.filter(t => !t.creatorId).length
-      };
-      queueNotification(taskInfo);
+      // 2. Если есть задачи в общую ленту — уведомляем ВСЕХ креаторов
+      const toFeedCount = createdTasks.filter(t => !t.creatorId).length;
+      if (toFeedCount > 0) {
+        const allCreators = await prisma.user.findMany({ where: { role: 'CREATOR' } });
+        
+        const pushPromises = allCreators.map(creator => 
+          sendPushNotification(creator.id, {
+            title: "Новые задачи в ленте!",
+            message: `В ленту Clipsio добавлено ${toFeedCount} видео.`,
+            url: "/creator"
+          })
+        );
+        await Promise.all(pushPromises);
+      }
+
+      // ТЕЛЕГРАМ ПОЛНОСТЬЮ УДАЛЕН ИЗ ЭТОГО РОУТА
 
       res.json({ success: true, count: createdTasks.length });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // --- СПИСКИ ДЛЯ КРЕАТОРА ---

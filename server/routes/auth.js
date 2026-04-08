@@ -22,4 +22,16 @@ router.post('/login', async (req, res) => {
   }
 });
 
+router.post('/subscribe', protect, async (req, res) => {
+  const { endpoint, keys } = req.body;
+  try {
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      update: { userId: req.user.id, p256dh: keys.p256dh, auth: keys.auth },
+      create: { endpoint, p256dh: keys.p256dh, auth: keys.auth, userId: req.user.id }
+    });
+    res.status(201).json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

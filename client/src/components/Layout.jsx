@@ -12,6 +12,23 @@ export default function Layout({ onLogout, user }) {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
+  const subscribeToPush = async () => {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: 'BIp0B0BFzhcZjiw5P7WOAKIEXD_WzCfEXIJjwXPHBW6AHyV-Er-NVBd1KLMfP3B1QTB2stt6Z1lVdhXGtHelm6M'
+      });
+
+      await axios.post('/api/auth/subscribe', subscription);
+      console.log("Пуши настроены!");
+    }
+  };
+
+  useEffect(() => {
+    if (user) subscribeToPush();
+  }, [user]);
+
   // Определяем, какие пункты меню показывать на основе роли
   const menuItems = [
     { to: "/", icon: <LayoutDashboard size={20} />, label: "Дашборд", roles: ['ADMIN', 'MANAGER', 'CREATOR'] },

@@ -40,6 +40,17 @@ model User {
   uploads    Task[]   @relation("UploaderTasks")
   managed    Task[]   @relation("ManagerTasks") // Задачи, созданные этим менеджером
   createdAt  DateTime @default(now())
+  pushSubscriptions PushSubscription[]
+}
+
+model PushSubscription {
+  id        Int    @id @default(autoincrement())
+  userId    Int
+  user      User   @relation(fields: [userId], references: [id])
+  endpoint  String @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }
 
 model Channel {
