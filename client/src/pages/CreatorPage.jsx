@@ -210,12 +210,12 @@ export default function CreatorPage() {
                       onUpload={() => setUploadTarget(task)}
                       // ИСПРАВЛЕНО: Явно вызываем функцию и ждем обновления
                       onClaim={async () => {
-                        await axios.post(`/api/tasks/${task.id}/claim`);
+                        await api.post(`/api/tasks/${task.id}/claim`);
                         initPage();
                       }}
                       onAbandon={async () => {
                         if (!confirm("Вернуть задачу в ленту?")) return;
-                        await axios.post(`/api/tasks/${task.id}/abandon`);
+                        await api.post(`/api/tasks/${task.id}/abandon`);
                         initPage(); // Это обновит список и задача исчезнет из "В процессе"
                       }}
                       onCancelUpload={handleCancelUpload}

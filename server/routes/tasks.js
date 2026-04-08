@@ -8,7 +8,6 @@ const util = require('util');
 const prisma = require('../db');
 const { protect, authorize } = require('../auth');
 const { downloadVideoBackground } = require('../downloader');
-const { sendToGroup, queueNotification } = require('../telegram');
 const { sendPushNotification } = require('../push');
 
 const execPromise = util.promisify(exec);
@@ -191,20 +190,20 @@ module.exports = (io) => {
       const jwt = require('jsonwebtoken');
       jwt.verify(token, process.env.JWT_SECRET);
 
-      // ПОПРАВЛЕН ПУТЬ: __dirname это server/routes, выходим в server через ../
       const path = require('path');
-      const fullPath = path.join(__dirname, '../', '../', filePath); 
-      // Если папки originals/uploads лежат в корне server, то путь выше правильный.
-      // Если они внутри server/prisma, измени путь соответственно.
+      const fullPath = path.resolve(process.cwd(), filePath);
+
+      console.log("[Download] Запрос файла:", fullPath);
 
       if (fs.existsSync(fullPath)) {
+        // 3. Отправляем файл
         res.download(fullPath);
       } else {
-        console.error("File not found at:", fullPath);
-        res.status(404).send("Файл физически не найден на диске");
+        console.error("[Download] Файл не найден по пути:", fullPath);
+        res.status(404).json({ error: "Файл не найден на сервере" });
       }
     } catch (err) {
-      res.status(401).send("Не авторизован");
+      res.status(401).json({ error: "Ссылка недействительна или срок сессии истек" });
     }
   });
 
