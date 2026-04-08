@@ -29,8 +29,7 @@ export default function Layout({ onLogout, user }) {
       // 3. Подписываемся
       const subscribeOptions = {
         userVisibleOnly: true,
-        // ВАЖНО: конвертируем ключ здесь!
-        applicationServerKey: urlBase64ToUint8Array('ТВОЙ_ПУБЛИЧНЫЙ_VAPID_КЛЮЧ_ИЗ_ENV')
+        applicationServerKey: urlBase64ToUint8Array('BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs')
       };
 
       const subscription = await registration.pushManager.subscribe(subscribeOptions);
