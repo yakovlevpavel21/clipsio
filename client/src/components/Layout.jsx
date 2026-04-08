@@ -1,6 +1,6 @@
 // client/src/components/Layout.jsx
 import { useState, useEffect } from 'react';
-import axios from '../api';
+import api from '../api';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Upload, Settings, 
@@ -35,7 +35,7 @@ export default function Layout({ onLogout, user }) {
       const subJSON = subscription.toJSON();
       
       console.log("Отправка подписки на сервер...", subJSON);
-      await axios.post('/api/auth/subscribe', subJSON);
+      await api.post('/api/auth/subscribe', subJSON);
       console.log("Подписка сохранена в БД");
 
     } catch (err) {

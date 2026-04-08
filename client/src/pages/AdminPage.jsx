@@ -31,9 +31,9 @@ export default function AdminPage() {
     setError(null);
     try {
       const [u, c, s] = await Promise.all([
-        axios.get('/api/admin/users'),
-        axios.get('/api/channels'),
-        axios.get('/api/admin/settings')
+        api.get('/api/admin/users'),
+        api.get('/api/channels'),
+        api.get('/api/admin/settings')
       ]);
       
       setUsers(u.data);
@@ -83,9 +83,9 @@ export default function AdminPage() {
   const handleSaveUser = async (formData) => {
     try {
       if (userModal.data) {
-        await axios.patch(`/api/admin/users/${userModal.data.id}`, formData);
+        await api.patch(`/api/admin/users/${userModal.data.id}`, formData);
       } else {
-        await axios.post('/api/admin/users', formData);
+        await api.post('/api/admin/users', formData);
       }
       setUserModal({ open: false, data: null });
       fetchData();
@@ -97,7 +97,7 @@ export default function AdminPage() {
   // --- ЛОГИКА КАНАЛОВ ---
   const handleAddChannel = async (name) => {
     try {
-      await axios.post('/api/admin/channels', { name });
+      await api.post('/api/admin/channels', { name });
       fetchData();
     } catch (err) {
       alert("Ошибка при создании канала");
@@ -106,7 +106,7 @@ export default function AdminPage() {
 
   const updateChannel = async (id, data) => {
     try {
-      await axios.patch(`/api/admin/channels/${id}`, data);
+      await api.patch(`/api/admin/channels/${id}`, data);
       // Не вызываем fetchData для плавной работы инпутов (onBlur)
     } catch (err) {
       console.error("Update channel error");
@@ -116,7 +116,7 @@ export default function AdminPage() {
   // --- ЛОГИКА НАСТРОЕК (PROXY / TELEGRAM) ---
   const saveProxy = async () => {
     try {
-      await axios.post('/api/admin/settings', { key: 'proxy_url', value: proxy });
+      await api.post('/api/admin/settings', { key: 'proxy_url', value: proxy });
       alert("Настройки прокси сохранены");
     } catch (err) {
       alert("Ошибка сохранения прокси");
@@ -126,7 +126,7 @@ export default function AdminPage() {
   const checkTelegram = async () => {
     setTgStatus(prev => ({ ...prev, loading: true }));
     try {
-      const res = await axios.get('/api/admin/tg-status');
+      const res = await api.get('/api/admin/tg-status');
       setTgStatus({ loading: false, data: res.data });
     } catch (err) {
       setTgStatus({ loading: false, data: { online: false, error: "Нет связи с ботом" } });
@@ -136,7 +136,7 @@ export default function AdminPage() {
   const handleStartPairing = async () => {
     setIsStartingBot(true);
     try {
-      await axios.post('/api/admin/tg-start-pairing');
+      await api.post('/api/admin/tg-start-pairing');
       await checkTelegram(); // Обновляем статус, чтобы увидеть "Бот ищет группу"
     } catch (err) {
       alert(err.response?.data?.error || "Ошибка запуска бота");
@@ -147,7 +147,7 @@ export default function AdminPage() {
 
   const sendTestMsg = async () => {
     try {
-      await axios.post('/api/admin/tg-test');
+      await api.post('/api/admin/tg-test');
       alert("Тестовое сообщение отправлено!");
     } catch (err) {
       alert("Ошибка: " + (err.response?.data?.error || "Не удалось отправить"));
@@ -157,7 +157,7 @@ export default function AdminPage() {
   const handleResetTg = async () => {
     if (!confirm("Отвязать бота от группы? Он выйдет из чата автоматически.")) return;
     try {
-      await axios.post('/api/admin/tg-reset');
+      await api.post('/api/admin/tg-reset');
       fetchData();
     } catch (err) {
       alert("Ошибка при сбросе");
@@ -169,7 +169,7 @@ export default function AdminPage() {
     if (!confirm("Удалить безвозвратно?")) return;
     try {
       const endpoint = type === 'users' ? `/api/admin/users/${id}` : `/api/admin/channels/${id}`;
-      await axios.delete(endpoint);
+      await api.delete(endpoint);
       fetchData();
     } catch (err) {
       alert("Ошибка при удалении");

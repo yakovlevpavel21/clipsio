@@ -63,10 +63,10 @@ export default function ManagerPage() {
       const url = `/api/tasks/managed?skip=0&take=${ITEMS_PER_PAGE}&tab=${tab}&channelId=${selectedChannel}`;
       
       const [tasksRes, chanRes, creatorsRes, alertsRes] = await Promise.all([
-        axios.get(url, { signal: abortControllerRef.current.signal }),
-        axios.get('/api/channels', { signal: abortControllerRef.current.signal }),
-        axios.get('/api/tasks/creators', { signal: abortControllerRef.current.signal }),
-        axios.get('/api/tasks/alerts-status', { signal: abortControllerRef.current.signal })
+        api.get(url, { signal: abortControllerRef.current.signal }),
+        api.get('/api/channels', { signal: abortControllerRef.current.signal }),
+        api.get('/api/tasks/creators', { signal: abortControllerRef.current.signal }),
+        api.get('/api/tasks/alerts-status', { signal: abortControllerRef.current.signal })
       ]);
 
       setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : []);
@@ -76,7 +76,7 @@ export default function ManagerPage() {
       
       setHasMore(tasksRes.data.length === ITEMS_PER_PAGE);
     } catch (err) {
-      if (axios.isCancel(err)) return;
+      if (api.isCancel(err)) return;
       console.error("Fetch error:", err);
       setError("Не удалось загрузить данные сервера");
     } finally {
@@ -103,7 +103,7 @@ export default function ManagerPage() {
       const currentLength = tasks.length;
       const url = `/api/tasks/managed?skip=${currentLength}&take=${ITEMS_PER_PAGE}&tab=${tab}&channelId=${selectedChannel}`;
       
-      const res = await axios.get(url);
+      const res = await api.get(url);
       const newTasks = res.data;
 
       // ЗАЩИТА 2: Если пришел пустой массив или меньше лимита — отключаем пагинацию навсегда для этого таба
@@ -136,7 +136,7 @@ export default function ManagerPage() {
   const handleDeleteTask = async (id) => {
     if (!window.confirm("Удалить задачу безвозвратно?")) return;
     try {
-      await axios.delete(`/api/tasks/${id}`);
+      await api.delete(`/api/tasks/${id}`);
       // Локально удаляем из списка, чтобы не перезагружать всё
       setTasks(prev => prev.filter(t => t.id !== id));
     } catch (err) {

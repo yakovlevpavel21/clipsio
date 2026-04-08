@@ -1,7 +1,7 @@
 // client/src/components/UploadModal.jsx
 import { useState, useEffect } from 'react';
 import { X, UploadCloud, Loader2, Check, RefreshCcw, Film, PlayCircle } from 'lucide-react';
-import axios from 'axios';
+import api from 'axios';
 
 export default function UploadModal({ task, onClose, onSuccess }) {
   const [dragActive, setDragActive] = useState(false);
@@ -35,7 +35,7 @@ export default function UploadModal({ task, onClose, onSuccess }) {
     formData.append('video', selectedFile);
     
     try {
-      const res = await axios.post(`/api/tasks/${task.id}/upload`, formData);
+      const res = await api.post(`/api/tasks/${task.id}/upload`, formData);
       
       if (res.data.tgWarning) {
         alert(`⚠️ ${res.data.tgWarning}`);

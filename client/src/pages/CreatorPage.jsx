@@ -1,6 +1,6 @@
 // client/src/pages/CreatorPage.jsx
 import { useEffect, useState, useRef } from 'react';
-import axios from '../api';
+import api from '../api';
 import { Loader2, Zap, X, Calendar, List } from 'lucide-react';
 import TaskCard from '../components/TaskCard';
 import UploadModal from '../components/UploadModal';
@@ -44,9 +44,9 @@ export default function CreatorPage() {
       
       // Грузим задачи, каналы и статусы алертов одновременно
       const [tasksRes, chanRes, alertsRes] = await Promise.all([
-        axios.get(url),
-        axios.get('/api/channels'),
-        axios.get('/api/tasks/alerts-status') // Запрос алертов
+        api.get(url),
+        api.get('/api/channels'),
+        api.get('/api/tasks/alerts-status') // Запрос алертов
       ]);
 
       setTasks(tasksRes.data);
@@ -74,7 +74,7 @@ export default function CreatorPage() {
       const endpoint = tab === 'available' ? 'available' : 'history';
       const url = `/api/tasks/${endpoint}?skip=${tasks.length}&take=${ITEMS_PER_PAGE}&channelId=${selectedChannel}`;
 
-      const res = await axios.get(url);
+      const res = await api.get(url);
       const newTasks = res.data;
 
       if (newTasks.length < ITEMS_PER_PAGE) {
@@ -98,7 +98,7 @@ export default function CreatorPage() {
   const handleCancelUpload = async (id) => {
     if (!confirm("Отозвать видео с проверки?")) return;
     try {
-      await axios.post(`/api/tasks/${id}/cancel-upload`);
+      await api.post(`/api/tasks/${id}/cancel-upload`);
       initPage(); // Перезагружаем текущую вкладку
     } catch (err) { alert("Ошибка"); }
   };
@@ -206,8 +206,8 @@ export default function CreatorPage() {
                       key={task.id} task={task} mode={tab}
                       onPreview={handleOpenPreview}
                       onUpload={() => setUploadTarget(task)}
-                      onClaim={() => axios.post(`/api/tasks/${task.id}/claim`).then(initPage)}
-                      onAbandon={() => confirm("Отказаться?") && axios.post(`/api/tasks/${task.id}/abandon`).then(initPage)}
+                      onClaim={() => api.post(`/api/tasks/${task.id}/claim`).then(initPage)}
+                      onAbandon={() => confirm("Отказаться?") && api.post(`/api/tasks/${task.id}/abandon`).then(initPage)}
                       onCancelUpload={handleCancelUpload}
                     />
                   ))}

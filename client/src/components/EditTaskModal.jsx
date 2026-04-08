@@ -1,6 +1,6 @@
 // client/src/components/EditTaskModal.jsx
 import { useState, useEffect } from 'react';
-import axios from '../api';
+import api from '../api';
 import { X, Calendar, Clock, User, Save, Loader2, Info } from 'lucide-react';
 
 export default function EditTaskModal({ task, creators, onClose, onSuccess }) {
@@ -39,7 +39,7 @@ export default function EditTaskModal({ task, creators, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      await axios.patch(`/api/tasks/${task.id}`, {
+      await api.patch(`/api/tasks/${task.id}`, {
         deadline: formData.deadline || null,
         scheduledAt: formData.scheduledAt || null,
         creatorId: formData.creatorId ? parseInt(formData.creatorId) : null

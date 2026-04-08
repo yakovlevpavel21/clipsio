@@ -1,6 +1,6 @@
 // client/src/pages/LoginPage.jsx
 import { useState } from 'react';
-import axios from '../api';
+import api from '../api';
 import { Zap, Loader2, Lock, User } from 'lucide-react';
 
 export default function LoginPage({ onLogin }) {
@@ -13,7 +13,7 @@ export default function LoginPage({ onLogin }) {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('/api/auth/login', formData);
+      const res = await api.post('/api/auth/login', formData);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       onLogin(res.data.user);

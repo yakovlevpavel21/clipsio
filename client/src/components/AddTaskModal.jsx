@@ -25,7 +25,7 @@ export default function AddTaskModal({ onClose, onSuccess, channels }) {
   useEffect(() => {
     const fetchCreators = async () => {
       try {
-        const res = await axios.get('/api/tasks/creators');
+        const res = await api.get('/api/tasks/creators');
         setCreators(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Ошибка загрузки креаторов:", err);
@@ -57,7 +57,7 @@ export default function AddTaskModal({ onClose, onSuccess, channels }) {
   // Функция для "тихого" обновления статуса видео без сброса всей формы
   const refreshStatus = async () => {
     try {
-      const res = await axios.post('/api/tasks/fetch-info', { url, useProxy });
+      const res = await api.post('/api/tasks/fetch-info', { url, useProxy });
       setVideoInfo(res.data);
     } catch (err) {
       console.error("Ошибка обновления статуса:", err);
@@ -74,7 +74,7 @@ export default function AddTaskModal({ onClose, onSuccess, channels }) {
 
     try {
       const isRetry = videoInfo && videoInfo.status === 'ERROR';
-      const res = await axios.post('/api/tasks/fetch-info', { 
+      const res = await api.post('/api/tasks/fetch-info', { 
         url, 
         force: isRetry, 
         useProxy 
@@ -163,7 +163,7 @@ export default function AddTaskModal({ onClose, onSuccess, channels }) {
         scheduledAt: taskConfigs[id].scheduledAt || null
       }));
 
-      const res = await axios.post('/api/tasks/bulk', {
+      const res = await api.post('/api/tasks/bulk', {
         originalVideoId: videoInfo.id,
         tasks: tasksArray
       });

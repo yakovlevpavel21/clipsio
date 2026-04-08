@@ -15,7 +15,7 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get('/api/stats');
+      const res = await api.get('/api/stats');
       setStats(res.data);
     } catch (err) {
       console.error(err);

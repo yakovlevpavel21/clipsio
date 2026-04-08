@@ -1,7 +1,7 @@
 // client/src/components/PublishModal.jsx
 import { useState, useEffect } from 'react';
 import { X, Copy, RotateCcw, Check, Calendar, ExternalLink, FileVideo, Eye, Loader2, PlayCircle } from 'lucide-react';
-import axios from '../api';
+import api from '../api';
 
 export default function PublishModal({ task, onClose, onSuccess }) {
   const [view, setView] = useState('reaction'); 
@@ -50,7 +50,7 @@ export default function PublishModal({ task, onClose, onSuccess }) {
     if (!youtubeUrl) return alert("Введите ссылку на YouTube!");
     setLoading(true);
     try {
-      const res = await axios.post(`/api/tasks/${task.id}/publish`, { youtubeUrl, scheduledAt });
+      const res = await api.post(`/api/tasks/${task.id}/publish`, { youtubeUrl, scheduledAt });
 
       if (res.data.tgWarning) {
         alert(`⚠️ ${res.data.tgWarning}`);
@@ -66,7 +66,7 @@ export default function PublishModal({ task, onClose, onSuccess }) {
     
     setLoading(true);
     try {
-      const res = await axios.post(`/api/tasks/${task.id}/reject`, { reason: rejectionReason });
+      const res = await api.post(`/api/tasks/${task.id}/reject`, { reason: rejectionReason });
       
       if (res.data.tgWarning) {
         alert(`⚠️ ${res.data.tgWarning}`);
