@@ -1,5 +1,3 @@
-// client/src/api.js
-
 import axiosLib from 'axios';
 import { io } from 'socket.io-client';
 
@@ -23,15 +21,14 @@ export const socket = io({
 
 export const getDownloadUrl = (filePath, fileName) => {
   const token = localStorage.getItem('token');
+
   const params = new URLSearchParams({
     path: filePath,
     token: token || '',
-    name: fileName || 'video.mp4',
-    attachment: 'true'
+    name: fileName || 'video.mp4'
   });
 
-  // window.location.origin автоматически подставит ваш домен (например, https://clipsio.ru)
-  return `${window.location.origin}/api/tasks/download-file?${params.toString()}`;
+  return `/api/tasks/download-file?${params.toString()}`;
 };
 
 export default api;

@@ -196,28 +196,62 @@ module.exports = (io) => {
 
   // --- ДЕЙСТВИЯ С ЗАДАЧАМИ ---
   router.get('/download-file', async (req, res) => {
-    // Убедитесь, что достаете из req.query!
-    const { path: filePath, token, name } = req.query; 
+    const { path: filePath, token, name } = req.query;
 
     try {
       const jwt = require('jsonwebtoken');
-      // Проверяем токен из ссылки
+      const pathModule = require('path');
+      const fs = require('fs');
+
       jwt.verify(token, process.env.JWT_SECRET);
 
-      const path = require('path');
-      const fullPath = path.resolve(process.cwd(), filePath);
+      const fullPath = pathModule.resolve(process.cwd(), filePath);
 
-      if (fs.existsSync(fullPath)) {
-        // КРИТИЧНО ДЛЯ iOS: ставим эти заголовки
-        res.setHeader('Content-Type', 'video/mp4');
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(name || 'video.mp4')}"`);
-        
-        fs.createReadStream(fullPath).pipe(res);
+      if (!fs.existsSync(fullPath)) {
+        return res.status(404).send("File not found");
+      }
+
+      const stat = fs.statSync(fullPath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      const downloadName = name ? String(name) : 'video.mp4';
+
+      // 🔥 КЛЮЧЕВОЕ
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(downloadName)}"`
+      );
+
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1]
+          ? parseInt(parts[1], 10)
+          : fileSize - 1;
+
+        const chunkSize = end - start + 1;
+
+        const file = fs.createReadStream(fullPath, { start, end });
+
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Content-Length': chunkSize,
+        });
+
+        file.pipe(res);
       } else {
-        res.status(404).send("Файл не найден на сервере");
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+        });
+
+        fs.createReadStream(fullPath).pipe(res);
       }
     } catch (err) {
-      res.status(401).send("Сессия истекла, обновите страницу в Clipsio");
+      res.status(401).send("Unauthorized");
     }
   });
 
