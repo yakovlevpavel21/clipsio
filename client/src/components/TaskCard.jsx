@@ -121,7 +121,7 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
                 <button onClick={(e) => { e.stopPropagation(); onCancelUpload(task.id); }} className="text-red-500 font-bold text-[10px] uppercase ml-auto px-2 hover:underline">Отозвать</button>
               )}
               {task.status === 'PUBLISHED' && task.youtubeUrl && (
-                <button onClick={(e) => { e.stopPropagation(); window.open(task.youtubeUrl, '_blank'); }} className="p-2 bg-red-500 text-white rounded-xl ml-auto active:scale-90 transition-transform shadow-lg shadow-red-500/20"><Youtube size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); window.open(task.youtubeUrl, '_blank'); }} className="p-2 bg-red-500 text-white rounded-xl ml-auto active:scale-90 transition-transform shadow-lg shadow-red-500/20"><PlayCircle size={16}/></button>
               )}
             </div>
           )}
