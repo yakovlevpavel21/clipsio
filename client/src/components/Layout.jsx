@@ -23,7 +23,7 @@ export default function Layout({ onLogout, user }) {
       let subscription = await registration.pushManager.getSubscription();
 
       if (!subscription) {
-        const publicKey = urlBase64ToUint8Array('ТВОЙ_ПУБЛИЧНЫЙ_КЛЮЧ');
+        const publicKey = urlBase64ToUint8Array('BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs');
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: publicKey
