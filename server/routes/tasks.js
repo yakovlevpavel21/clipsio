@@ -86,19 +86,24 @@ module.exports = (io) => {
   // --- СОЗДАНИЕ ЗАДАЧ (BULK) ---
   router.post('/bulk', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
     const { originalVideoId, tasks } = req.body;
-    
+
+    if (!originalVideoId || !tasks || !Array.isArray(tasks)) {
+      return res.status(400).json({ error: "Неверные данные запроса" });
+    }
+
     try {
       const createdTasks = await Promise.all(tasks.map(async (t) => {
         return prisma.task.create({
           data: {
             originalVideoId: parseInt(originalVideoId),
-            channelId: parseInt(t.channelId),
+            channelId: parseInt(t.channelId), // берем из t
             managerId: req.user.id,
-            creatorId: t.creatorId ? parseInt(t.creatorId) : null,
+            priority: 'normal',
+            creatorId: t.creatorId ? parseInt(t.creatorId) : null, // берем из t
             status: t.creatorId ? 'IN_PROGRESS' : 'AWAITING_REACTION',
             claimedAt: t.creatorId ? new Date() : null,
-            deadline: t.deadline ? new Date(t.deadline) : null,
-            scheduledAt: t.scheduledAt ? new Date(scheduledAt) : null,
+            deadline: t.deadline ? new Date(t.deadline) : null, // берем из t
+            scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null, // берем из t
           },
           include: { channel: true, creator: true, originalVideo: true }
         });
@@ -129,9 +134,6 @@ module.exports = (io) => {
         );
         await Promise.all(pushPromises);
       }
-
-      // ТЕЛЕГРАМ ПОЛНОСТЬЮ УДАЛЕН ИЗ ЭТОГО РОУТА
-
       res.json({ success: true, count: createdTasks.length });
     } catch (err) {
       console.error(err);
