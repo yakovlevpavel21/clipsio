@@ -13,35 +13,32 @@ export default function Layout({ onLogout, user }) {
   const location = useLocation();
 
   const subscribeToPush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.warn("Пуши не поддерживаются этим браузером");
-      return;
-    }
+    if (!('serviceWorker' in navigator)) return;
 
     try {
-      // 1. Регистрируем воркер
       const registration = await navigator.serviceWorker.register('/sw.js');
-      console.log("Service Worker зарегистрирован");
-
-      // 2. Ждем готовности
       await navigator.serviceWorker.ready;
 
-      // 3. Подписываемся
-      const subscribeOptions = {
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array('BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs')
-      };
+      // Проверяем, есть ли уже подписка
+      let subscription = await registration.pushManager.getSubscription();
 
-      const subscription = await registration.pushManager.subscribe(subscribeOptions);
-      console.log("Браузер выдал подписку:", subscription);
+      if (!subscription) {
+        const publicKey = urlBase64ToUint8Array('ТВОЙ_ПУБЛИЧНЫЙ_КЛЮЧ');
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: publicKey
+        });
+      }
 
-      // 4. Отправляем на сервер
-      // Важно: объект subscription нужно передать целиком или вытащить ключи
-      await axios.post('/api/auth/subscribe', subscription);
-      console.log("Подписка успешно сохранена в БД!");
+      // ВАЖНО: Мы должны отправить подписку как обычный JSON объект
+      const subJSON = subscription.toJSON();
+      
+      console.log("Отправка подписки на сервер...", subJSON);
+      await axios.post('/api/auth/subscribe', subJSON);
+      console.log("Подписка сохранена в БД");
 
     } catch (err) {
-      console.error("Ошибка при настройке пушей:", err);
+      console.error("Ошибка подписки:", err);
     }
   };
 

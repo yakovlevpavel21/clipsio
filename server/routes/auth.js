@@ -24,34 +24,32 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/subscribe', protect, async (req, res) => {
-  const sub = req.body; // Это весь объект подписки
+  const { endpoint, keys } = req.body;
 
-  // Лог для проверки: видишь ли ты данные в терминале сервера?
-  console.log("Получена подписка от юзера:", req.user.id, sub);
-
-  if (!sub.endpoint || !sub.keys) {
+  if (!endpoint || !keys) {
     return res.status(400).json({ error: "Неверный формат подписки" });
   }
 
   try {
+    // Сохраняем подписку. Если endpoint уже есть — обновляем владельца
     await prisma.pushSubscription.upsert({
-      where: { endpoint: sub.endpoint },
+      where: { endpoint: endpoint },
       update: { 
-        userId: req.user.id, 
-        p256dh: sub.keys.p256dh, 
-        auth: sub.keys.auth 
+        userId: req.user.id,
+        p256dh: keys.p256dh,
+        auth: keys.auth
       },
       create: { 
-        endpoint: sub.endpoint, 
-        p256dh: sub.keys.p256dh, 
-        auth: sub.keys.auth, 
-        userId: req.user.id 
+        endpoint: endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        userId: req.user.id
       }
     });
     res.status(201).json({ success: true });
   } catch (err) {
-    console.error("Ошибка сохранения подписки в БД:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("DB Save Error:", err);
+    res.status(500).json({ error: "Ошибка БД" });
   }
 });
 
