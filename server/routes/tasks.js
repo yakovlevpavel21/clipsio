@@ -131,6 +131,18 @@ module.exports = (io) => {
   });
 
   // --- СПИСКИ ДЛЯ КРЕАТОРА ---
+  router.post('/:id/abandon', protect, async (req, res) => {
+    try {
+      await prisma.task.update({
+        where: { id: parseInt(req.params.id) },
+        data: { status: 'AWAITING_REACTION', creatorId: null }
+      });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
   router.get('/available', protect, async (req, res) => {
     const { skip = 0, take = 10, channelId } = req.query;
     const where = { status: 'AWAITING_REACTION' };
@@ -184,26 +196,28 @@ module.exports = (io) => {
 
   // --- ДЕЙСТВИЯ С ЗАДАЧАМИ ---
   router.get('/download-file', async (req, res) => {
-    const { path: filePath, token } = req.query;
+    // Убедитесь, что достаете из req.query!
+    const { path: filePath, token, name } = req.query; 
 
     try {
       const jwt = require('jsonwebtoken');
+      // Проверяем токен из ссылки
       jwt.verify(token, process.env.JWT_SECRET);
 
       const path = require('path');
       const fullPath = path.resolve(process.cwd(), filePath);
 
-      console.log("[Download] Запрос файла:", fullPath);
-
       if (fs.existsSync(fullPath)) {
-        // 3. Отправляем файл
-        res.download(fullPath);
+        // КРИТИЧНО ДЛЯ iOS: ставим эти заголовки
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(name || 'video.mp4')}"`);
+        
+        fs.createReadStream(fullPath).pipe(res);
       } else {
-        console.error("[Download] Файл не найден по пути:", fullPath);
-        res.status(404).json({ error: "Файл не найден на сервере" });
+        res.status(404).send("Файл не найден на сервере");
       }
     } catch (err) {
-      res.status(401).json({ error: "Ссылка недействительна или срок сессии истек" });
+      res.status(401).send("Сессия истекла, обновите страницу в Clipsio");
     }
   });
 
