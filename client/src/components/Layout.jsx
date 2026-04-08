@@ -76,7 +76,12 @@ export default function Layout({ onLogout, user }) {
     <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1c] text-slate-900 dark:text-slate-100 transition-colors duration-300 flex flex-col lg:flex-row font-['Inter']">
       
       {/* --- MOBILE HEADER --- */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-[64px] flex items-center justify-between p-4 bg-white/90 dark:bg-[#1a1f2e]/90 backdrop-blur-md border-b dark:border-slate-800 z-[100]">
+      <header className="
+        lg:hidden fixed top-0 left-0 right-0 
+        pt-[calc(env(safe-area-inset-top)+10px)] pb-4 px-4 
+        bg-white dark:bg-[#1a1f2e] border-b dark:border-slate-800 z-[100]
+        flex items-center justify-between
+      ">
         <button 
           onClick={() => setIsMenuOpen(true)}
           className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
@@ -168,7 +173,7 @@ export default function Layout({ onLogout, user }) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 min-w-0 pt-[64px] lg:pt-0"> 
+      <main className="flex-1 min-w-0 pt-[calc(env(safe-area-inset-top)+64px)] lg:pt-0">
         <div className="p-4 md:p-8 lg:p-10 max-w-6xl mx-auto w-full">
           <Outlet />
         </div>
