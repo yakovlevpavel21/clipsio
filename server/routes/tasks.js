@@ -389,41 +389,54 @@ module.exports = (io) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  // 1. Получить уведомления юзера
-  router.get('/notifications', protect, async (req, res) => {
-    const notifications = await prisma.notification.findMany({
-      where: { userId: req.user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 50
-    });
-    res.json(notifications);
-  });
-
-  // 2. Пометить все как прочитанные
-  router.post('/notifications/read-all', protect, async (req, res) => {
-    await prisma.notification.updateMany({
-      where: { userId: req.user.id, isRead: false },
-      data: { isRead: true }
-    });
-    res.json({ success: true });
-  });
-
-  // 3. Получить настройки
   router.get('/notifications/preferences', protect, async (req, res) => {
-    let prefs = await prisma.userPreference.findUnique({ where: { userId: req.user.id } });
-    if (!prefs) {
-      prefs = await prisma.userPreference.create({ data: { userId: req.user.id } });
+    try {
+      let prefs = await prisma.userPreference.findUnique({ 
+        where: { userId: req.user.id } 
+      });
+      
+      // Если записи нет — создаем её по умолчанию
+      if (!prefs) {
+        prefs = await prisma.userPreference.create({
+          data: { userId: req.user.id, enabled: true }
+        });
+      }
+      
+      res.json(prefs);
+    } catch (err) {
+      console.error("Prefs GET Error:", err);
+      res.status(500).json({ error: err.message });
     }
-    res.json(prefs);
   });
 
-  // 4. Обновить настройки
+  // 2. Обновить настройки
   router.patch('/notifications/preferences', protect, async (req, res) => {
-    const updated = await prisma.userPreference.update({
-      where: { userId: req.user.id },
-      data: req.body
-    });
-    res.json(updated);
+    try {
+      const { enabled } = req.body;
+      const updated = await prisma.userPreference.upsert({
+        where: { userId: req.user.id },
+        update: { enabled },
+        create: { userId: req.user.id, enabled }
+      });
+      res.json(updated);
+    } catch (err) {
+      console.error("Prefs PATCH Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3. Получить уведомления
+  router.get('/notifications', protect, async (req, res) => {
+    try {
+      const notifications = await prisma.notification.findMany({
+        where: { userId: req.user.id },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      });
+      res.json(notifications);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   return router;
