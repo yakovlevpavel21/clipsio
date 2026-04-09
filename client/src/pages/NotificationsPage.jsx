@@ -131,30 +131,44 @@ const NotificationItem = memo(forwardRef(({ notif, onClick, onVisible }, ref) =>
   const itemRef = useRef();
 
   useEffect(() => {
+    // Порог 0.8 означает, что юзер должен увидеть почти всю карточку
     const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
+      if (entry.isIntersecting && !notif.isRead) {
         onVisible();
-        obs.disconnect();
+        // Мы не отключаем сразу, если хотим ловить другие события, но для прочтения достаточно одного раза
       }
-    }, { threshold: 0.7 });
+    }, { threshold: 0.8 });
+
     if (itemRef.current) obs.observe(itemRef.current);
     return () => obs.disconnect();
-  }, []);
+  }, [notif.isRead]); // Важно добавить зависимость
 
   return (
     <div 
       ref={node => { itemRef.current = node; if (ref) ref(node); }}
       onClick={onClick}
-      className={`p-4 md:p-5 rounded-[1.5rem] border cursor-pointer transition-all ${notif.isRead ? 'bg-white/40 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800 opacity-60' : 'bg-white dark:bg-slate-900 border-blue-500/20 shadow-md ring-1 ring-blue-500/5'}`}
+      // УДАЛЕНО active:scale-[0.98] для чистоты
+      className={`p-4 md:p-5 rounded-[1.5rem] border transition-all duration-500 ${
+        notif.isRead 
+          ? 'bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800 opacity-60' 
+          : 'bg-white dark:bg-slate-900 border-blue-500/20 shadow-md ring-1 ring-blue-500/5'
+      }`}
     >
       <div className="flex gap-4">
-        <div className={`p-3 rounded-xl h-fit ${notif.type === 'REVISION_NEEDED' ? 'bg-red-500/10 text-red-500' : notif.type === 'PUBLISHED' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}>
-           {notif.type === 'REVISION_NEEDED' ? <ShieldAlert size={20}/> : notif.type === 'PUBLISHED' ? <CheckCircle2 size={20}/> : <Video size={20}/>}
+        <div className={`p-3 rounded-xl h-fit ${
+          notif.type === 'REVISION_NEEDED' ? 'bg-red-500/10 text-red-500' : 
+          notif.type === 'PUBLISHED' ? 'bg-green-500/10 text-green-500' : 
+          'bg-blue-500/10 text-blue-500'
+        }`}>
+           {notif.type === 'REVISION_NEEDED' ? <ShieldAlert size={20}/> : 
+            notif.type === 'PUBLISHED' ? <CheckCircle2 size={20}/> : 
+            <Video size={20}/>}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-start mb-1">
             <h3 className="font-bold text-slate-900 dark:text-white text-sm md:text-base truncate pr-2">{notif.title}</h3>
-            <span className="text-[10px] font-bold text-slate-400 tabular-nums uppercase shrink-0">
+            {/* ТОЛЬКО ВРЕМЯ В КАРТОЧКЕ */}
+            <span className="text-[10px] font-bold text-slate-400 tabular-nums uppercase shrink-0 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
               {new Date(notif.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
             </span>
           </div>

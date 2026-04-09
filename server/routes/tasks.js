@@ -463,10 +463,15 @@ module.exports = (io) => {
   // 2. ПОМЕТКА ОДНОГО УВЕДОМЛЕНИЯ КАК ПРОЧИТАННОГО
   router.post('/notifications/:id/read', protect, async (req, res) => {
     try {
+      const userId = parseInt(req.user.id);
       await prisma.notification.update({
-        where: { id: parseInt(req.params.id), userId: req.user.id },
+        where: { id: parseInt(req.params.id), userId: userId },
         data: { isRead: true }
       });
+
+      // МГНОВЕННОЕ ОПОВЕЩЕНИЕ: говорим всем вкладкам этого юзера пересчитать счетчик
+      io.to(`user_${userId}`).emit('new_notification'); 
+
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
