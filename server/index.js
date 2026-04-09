@@ -32,10 +32,18 @@ const activeUsers = new Map();
 app.set('activeUsers', activeUsers); // Делаем Map доступным в роутах
 
 io.on('connection', (socket) => {
+  // Когда фронтенд присылает ID пользователя
   socket.on('user_online', (userId) => {
     const id = parseInt(userId);
-    socket.join(`user_${id}`);
+    if (!id) return;
+
     socket.userId = id;
+    
+    // ВАЖНО: Без этой строки сервер не сможет слать уведомления лично этому юзеру
+    socket.join(`user_${id}`); 
+    
+    console.log(`Юзер ${id} вошел в комнату user_${id}`);
+
     if (!activeUsers.has(id)) {
       activeUsers.set(id, new Set());
       io.emit('status_change', { userId: id, online: true });

@@ -28,21 +28,26 @@ export default function Layout({ onLogout, user }) {
   // 2. Инициализация уведомлений и сокетов
   useEffect(() => {
     if (user && socket) {
-      // 1. Проверяем при входе
+      // Проверка при первом входе
       checkNotifications();
 
-      // 2. Слушаем бэкенд в реальном времени
-      socket.on('new_notification', () => {
-        console.log("Получено новое уведомление!");
-        checkNotifications(); // Эта функция просто делает GET /api/tasks/notifications и обновляет unreadCount
-        
-        // БОНУС: можно заставить телефон вибрировать при получении (если в PWA)
-        if ('vibrate' in navigator) {
-          navigator.vibrate(200);
-        }
-      });
+      // Слушаем сигнал
+      const handleNewNotif = () => {
+        console.log("🔔 СОКЕТ: Получено новое уведомление!");
+        checkNotifications(); // Перезагружает цифру в unreadCount
+      };
 
-      return () => socket.off('new_notification');
+      socket.on('new_notification', handleNewNotif);
+
+      // Логи для отладки подключения
+      socket.on('connect', () => console.log("✅ Сокет подключен"));
+      socket.on('disconnect', () => console.log("❌ Сокет отключен"));
+
+      return () => {
+        socket.off('new_notification', handleNewNotif);
+        socket.off('connect');
+        socket.off('disconnect');
+      };
     }
   }, [user]);
 
