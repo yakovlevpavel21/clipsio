@@ -95,6 +95,12 @@ export default function ManagerPage() {
   }, [tab, selectedChannel]);
 
   useEffect(() => {
+    if (location.state?.targetTab) {
+      setTab(location.state.targetTab);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
     if (location.state?.scrollToTaskId && tasks.length > 0) {
       const taskId = location.state.scrollToTaskId;
       

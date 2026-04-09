@@ -119,6 +119,8 @@ module.exports = (io) => {
           await prisma.notification.create({
             data: {
               userId: task.creatorId,
+              taskId: task.id,
+              targetTab: "my",
               title: title,
               message: message,
               type: "TASK_ASSIGNED"
@@ -266,6 +268,7 @@ module.exports = (io) => {
           data: {
             userId: s.id,
             taskId: updatedTask.id,
+            targetTab: "active",
             title: "Реакция готова ✅",
             message: `${req.user.username} сдал видео по каналу ${updatedTask.channel.name}`,
             type: "REACTION_UPLOADED"
@@ -303,6 +306,7 @@ module.exports = (io) => {
           data: {
             userId: task.creatorId,
             taskId: task.id,
+            targetTab: "my",
             title: "Нужны правки ⚠️",
             message: `Канал: ${task.channel.name}. Причина: ${reason}`,
             type: "REVISION_NEEDED"
@@ -346,6 +350,7 @@ module.exports = (io) => {
           data: {
             userId: task.creatorId,
             taskId: task.id,
+            targetTab: "history",
             title: "Опубликовано! 🎉",
             message: `Видео для канала ${task.channel.name} успешно вышло на YouTube`,
             type: "PUBLISHED"

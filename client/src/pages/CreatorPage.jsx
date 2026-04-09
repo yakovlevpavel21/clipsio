@@ -36,22 +36,32 @@ export default function CreatorPage() {
   }, [tab, selectedChannel]);
 
   useEffect(() => {
+    if (location.state?.targetTab) {
+      setTab(location.state.targetTab);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    // Начинаем искать элемент только когда загружены задачи и выбран правильный таб
     if (location.state?.scrollToTaskId && tasks.length > 0) {
       const taskId = location.state.scrollToTaskId;
-      
-      // Небольшая задержка, чтобы карточки успели отрендериться
+
       const timer = setTimeout(() => {
         const element = document.getElementById(`task-${taskId}`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Подсветка задачи
-          element.classList.add('ring-2', 'ring-blue-500', 'ring-offset-4');
-          setTimeout(() => element.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-4'), 3000);
+          element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-4');
+          
+          // Очищаем стейт, чтобы не скроллило при обычном обновлении
+          window.history.replaceState({}, document.title);
+          
+          setTimeout(() => element.classList.remove('ring-4', 'ring-blue-500'), 3000);
         }
-      }, 600);
+      }, 800); // Чуть больше задержка, чтобы данные успели отрисоваться
+      
       return () => clearTimeout(timer);
     }
-  }, [location.state, tasks]);
+  }, [tasks, location.state]);
 
   // 1. Инициализация (сброс и первая загрузка)
   const initPage = async () => {
@@ -155,10 +165,10 @@ export default function CreatorPage() {
       
       {/* HEADER */}
       <header className="pt-10 mb-8 px-1 animate-in fade-in duration-500">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
                 Рабочая панель
               </h1>
             </div>

@@ -50,7 +50,8 @@ model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
-  taskId    Int?     // Ссылка на задачу (необязательно для системных)
+  taskId    Int?
+  targetTab String?  // Добавляем это поле (например: "my", "available", "history", "active")
   title     String
   message   String
   type      String   

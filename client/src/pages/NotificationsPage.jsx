@@ -58,14 +58,12 @@ export default function NotificationsPage() {
   };
 
   const handleNotifClick = (n) => {
-    if (!n.taskId) return;
     const targetPath = n.type === 'REACTION_UPLOADED' ? '/manager' : '/creator';
-    // Передаем taskId и флаг таба (если нужно)
+    
     navigate(targetPath, { 
       state: { 
         scrollToTaskId: n.taskId,
-        // Если это менеджер, мы обычно ищем в 'active', если креатор - в 'my' или 'available'
-        tabHint: n.type === 'REACTION_UPLOADED' ? 'active' : 'my' 
+        targetTab: n.targetTab // Передаем вкладку
       } 
     });
   };
