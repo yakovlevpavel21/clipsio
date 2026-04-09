@@ -40,7 +40,7 @@ export default function TaskCardManager({ task, onPreview, onPublish, onDelete, 
   };
 
   return (
-    <div className={`bg-white dark:bg-[#0f172a] rounded-2xl border p-3 flex flex-col md:flex-row gap-5 transition-all group shadow-sm ${getBorderStyle()}`}>
+    <div id={`task-${task.id}`} className={`bg-white dark:bg-[#0f172a] rounded-2xl border p-3 flex flex-col md:flex-row gap-5 transition-all group shadow-sm ${getBorderStyle()}`}>
       
       {/* ПРЕВЬЮ */}
       <div className="relative w-full md:w-48 aspect-video rounded-xl overflow-hidden bg-black shrink-0 border dark:border-white/5 shadow-md">

@@ -6,6 +6,7 @@ import TaskCard from '../components/TaskCard';
 import UploadModal from '../components/UploadModal';
 import VideoModal from '../components/VideoModal';
 import PageStatus from '../components/PageStatus';
+import { useLocation } from 'react-router-dom';
 
 export default function CreatorPage() {
   const [tasks, setTasks] = useState([]); // Текущий список задач для выбранного таба
@@ -27,10 +28,30 @@ export default function CreatorPage() {
   const isFetchingRef = useRef(false);
   const ITEMS_PER_PAGE = 10;
 
+  const location = useLocation();
+
   useEffect(() => {
     isFetchingRef.current = false;
     initPage();
   }, [tab, selectedChannel]);
+
+  useEffect(() => {
+    if (location.state?.scrollToTaskId && tasks.length > 0) {
+      const taskId = location.state.scrollToTaskId;
+      
+      // Небольшая задержка, чтобы карточки успели отрендериться
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`task-${taskId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Подсветка задачи
+          element.classList.add('ring-2', 'ring-blue-500', 'ring-offset-4');
+          setTimeout(() => element.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-4'), 3000);
+        }
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state, tasks]);
 
   // 1. Инициализация (сброс и первая загрузка)
   const initPage = async () => {

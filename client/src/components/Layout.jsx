@@ -29,14 +29,14 @@ export default function Layout({ onLogout, user }) {
   useEffect(() => {
     if (user) {
       checkNotifications();
-      
-      // Подписываемся на событие новых уведомлений
-      socket.on('new_notification', () => {
-        checkNotifications();
-        // Можно добавить системный звук или вибрацию здесь
-      });
+      socket.on('new_notification', checkNotifications);
+      // Добавляем этот слушатель, чтобы NotificationsPage мог "пнуть" Layout
+      socket.on('notif_read_locally', checkNotifications); 
 
-      return () => socket.off('new_notification');
+      return () => {
+        socket.off('new_notification');
+        socket.off('notif_read_locally');
+      };
     }
   }, [user]);
 
@@ -56,12 +56,12 @@ export default function Layout({ onLogout, user }) {
     { 
       to: "/notifications", 
       icon: (
-        <div className="relative">
+        <div className="relative flex items-center justify-center">
           <Bell size={20} />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white dark:border-slate-900"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white dark:border-slate-900"></span>
             </span>
           )}
         </div>

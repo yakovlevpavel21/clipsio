@@ -5,6 +5,7 @@ import {
   Plus, List, Calendar, X, Loader2, CheckCircle2, 
   Clock, Send, Zap, Filter, Sparkles, Search 
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 // Компоненты
 import PageStatus from '../components/PageStatus';
@@ -42,6 +43,8 @@ export default function ManagerPage() {
   const [selectedTaskForEdit, setSelectedTaskForEdit] = useState(null);
   const [selectedTaskForPublish, setSelectedTaskForPublish] = useState(null);
   const [activePreview, setActivePreview] = useState(null);
+
+  const location = useLocation();
 
   // 1. ПЕРВИЧНАЯ И ПОЛНАЯ ЗАГРУЗКА (При смене таба или фильтра)
   const initPage = async () => {
@@ -90,6 +93,21 @@ export default function ManagerPage() {
   useEffect(() => {
     initPage();
   }, [tab, selectedChannel]);
+
+  useEffect(() => {
+    if (location.state?.scrollToTaskId && tasks.length > 0) {
+      const taskId = location.state.scrollToTaskId;
+      
+      setTimeout(() => {
+        const element = document.getElementById(`task-${taskId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-blue-500', 'ring-offset-4');
+          setTimeout(() => element.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-4'), 3000);
+        }
+      }, 600);
+    }
+  }, [location.state, tasks]);
 
   // 2. ПОДГРУЗКА ДАННЫХ ПРИ СКРОЛЛЕ
   const fetchMoreTasks = async () => {

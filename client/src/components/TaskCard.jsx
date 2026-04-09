@@ -112,7 +112,7 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
   };
 
   return (
-    <div className={`bg-white dark:bg-[#0f172a] rounded-2xl border p-3 flex flex-col md:flex-row gap-4 transition-all hover:shadow-md ${getBorderStyle()}`}>
+    <div id={`task-${task.id}`} className={`bg-white dark:bg-[#0f172a] rounded-2xl border p-3 flex flex-col md:flex-row gap-4 transition-all hover:shadow-md ${getBorderStyle()}`}>
       
       {/* ПРЕВЬЮ */}
       <div className="relative w-full md:w-48 aspect-video rounded-xl overflow-hidden bg-black shrink-0 shadow-sm border dark:border-white/5">
