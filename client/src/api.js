@@ -37,7 +37,11 @@ export const fetchFileAsBlob = async (url) => {
 };
 
 export async function subscribeUserToPush() {
-  if (!('serviceWorker' in navigator)) return false;
+  // Проверка: поддерживаются ли вообще сервис-воркеры и уведомления
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn("Push-уведомления не поддерживаются этим браузером");
+    return false;
+  }
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js');
@@ -47,8 +51,6 @@ export async function subscribeUserToPush() {
 
     if (!subscription) {
       const publicKey = 'BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs';
-      
-      // Вспомогательная функция внутри
       const padding = '='.repeat((4 - publicKey.length % 4) % 4);
       const base64 = (publicKey + padding).replace(/\-/g, '+').replace(/_/g, '/');
       const rawData = window.atob(base64);
@@ -64,13 +66,13 @@ export async function subscribeUserToPush() {
     await api.post('/api/auth/subscribe', subscription.toJSON());
     return true;
   } catch (err) {
-    console.error("Push error:", err);
+    console.error("Ошибка при подписке на пуши:", err);
     return false;
   }
 }
 
-export const getNotifications = () => api.get('/api/tasks/notifications');
-export const markNotificationsRead = () => api.post('/api/tasks/notifications/read-all');
+export const getNotifications = (skip = 0, take = 15) => api.get(`/api/tasks/notifications?skip=${skip}&take=${take}`);
+export const markNotifRead = (id) => api.post(`/api/tasks/notifications/${id}/read`);
 export const getPreferences = () => api.get('/api/tasks/notifications/preferences');
 export const updatePreferences = (data) => api.patch('/api/tasks/notifications/preferences', data);
 

@@ -112,7 +112,8 @@ module.exports = (io) => {
       for (const task of createdTasks) {
         if (task.creatorId) {
           const title = "Новое задание! 🎬";
-          const message = `Для канала ${task.channel.name}: ${task.originalVideo.title || 'Без названия'}`;
+          const deadlineText = task.deadline ? ` Дедлайн: ${new Date(task.deadline).toLocaleString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}` : '';
+          const message = `Канал: ${task.channel.name}.${deadlineText}`;
 
           // 1. Сохраняем в историю уведомлений БД
           await prisma.notification.create({
@@ -264,6 +265,7 @@ module.exports = (io) => {
         await prisma.notification.create({
           data: {
             userId: s.id,
+            taskId: updatedTask.id,
             title: "Реакция готова ✅",
             message: `${req.user.username} сдал видео по каналу ${updatedTask.channel.name}`,
             type: "REACTION_UPLOADED"
@@ -300,8 +302,9 @@ module.exports = (io) => {
         await prisma.notification.create({
           data: {
             userId: task.creatorId,
+            taskId: task.id,
             title: "Нужны правки ⚠️",
-            message: `Видео по каналу ${task.channel.name} отклонено: ${reason}`,
+            message: `Канал: ${task.channel.name}. Причина: ${reason}`,
             type: "REVISION_NEEDED"
           }
         });
@@ -342,8 +345,9 @@ module.exports = (io) => {
         await prisma.notification.create({
           data: {
             userId: task.creatorId,
-            title: "Видео опубликовано! 🎉",
-            message: `Ваша работа по видео "${task.originalVideo.title}" уже на YouTube.`,
+            taskId: task.id,
+            title: "Опубликовано! 🎉",
+            message: `Видео для канала ${task.channel.name} успешно вышло на YouTube`,
             type: "PUBLISHED"
           }
         });
@@ -392,21 +396,25 @@ module.exports = (io) => {
   router.get('/notifications/preferences', protect, async (req, res) => {
     try {
       const userId = parseInt(req.user.id);
-      
-      let prefs = await prisma.userPreference.findUnique({ 
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const prefs = await prisma.userPreference.findUnique({ 
         where: { userId: userId } 
       });
       
       if (!prefs) {
-        prefs = await prisma.userPreference.create({
+        // Создаем запись если её нет
+        const newPrefs = await prisma.userPreference.create({
           data: { userId: userId, enabled: true }
         });
+        return res.json(newPrefs);
       }
       
       res.json(prefs);
     } catch (err) {
-      console.error("Prefs GET Error:", err);
-      res.status(500).json({ error: "Ошибка загрузки настроек" });
+      // ВАЖНО: возвращаем 200 с дефолтными настройками вместо 500, чтобы фронтенд не падал
+      console.error("Prefs Error:", err);
+      res.json({ enabled: true, userId: req.user.id });
     }
   });
 
@@ -431,17 +439,31 @@ module.exports = (io) => {
 
   // 3. Получить уведомления
   router.get('/notifications', protect, async (req, res) => {
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 15;
+
     try {
-      const userId = parseInt(req.user.id);
       const notifications = await prisma.notification.findMany({
-        where: { userId: userId },
+        where: { userId: req.user.id },
         orderBy: { createdAt: 'desc' },
-        take: 50
+        skip,
+        take
       });
       res.json(notifications);
     } catch (err) {
-      res.status(500).json({ error: "Ошибка загрузки уведомлений" });
+      res.status(500).json({ error: err.message });
     }
+  });
+
+  // 2. ПОМЕТКА ОДНОГО УВЕДОМЛЕНИЯ КАК ПРОЧИТАННОГО
+  router.post('/notifications/:id/read', protect, async (req, res) => {
+    try {
+      await prisma.notification.update({
+        where: { id: parseInt(req.params.id), userId: req.user.id },
+        data: { isRead: true }
+      });
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   return router;

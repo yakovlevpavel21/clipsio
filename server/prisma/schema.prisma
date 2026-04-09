@@ -50,9 +50,10 @@ model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
+  taskId    Int?     // Ссылка на задачу (необязательно для системных)
   title     String
   message   String
-  type      String   // TASK_ASSIGNED, REVISION_NEEDED, PUBLISHED, SYSTEM
+  type      String   
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 }
