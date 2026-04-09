@@ -391,51 +391,56 @@ module.exports = (io) => {
 
   router.get('/notifications/preferences', protect, async (req, res) => {
     try {
+      const userId = parseInt(req.user.id);
+      
       let prefs = await prisma.userPreference.findUnique({ 
-        where: { userId: req.user.id } 
+        where: { userId: userId } 
       });
       
-      // Если записи нет — создаем её по умолчанию
       if (!prefs) {
         prefs = await prisma.userPreference.create({
-          data: { userId: req.user.id, enabled: true }
+          data: { userId: userId, enabled: true }
         });
       }
       
       res.json(prefs);
     } catch (err) {
       console.error("Prefs GET Error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Ошибка загрузки настроек" });
     }
   });
 
   // 2. Обновить настройки
   router.patch('/notifications/preferences', protect, async (req, res) => {
     try {
+      const userId = parseInt(req.user.id);
       const { enabled } = req.body;
+
       const updated = await prisma.userPreference.upsert({
-        where: { userId: req.user.id },
-        update: { enabled },
-        create: { userId: req.user.id, enabled }
+        where: { userId: userId },
+        update: { enabled: Boolean(enabled) },
+        create: { userId: userId, enabled: Boolean(enabled) }
       });
+      
       res.json(updated);
     } catch (err) {
       console.error("Prefs PATCH Error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Ошибка сохранения настроек" });
     }
   });
 
   // 3. Получить уведомления
   router.get('/notifications', protect, async (req, res) => {
     try {
+      const userId = parseInt(req.user.id);
       const notifications = await prisma.notification.findMany({
-        where: { userId: req.user.id },
+        where: { userId: userId },
         orderBy: { createdAt: 'desc' },
         take: 50
       });
       res.json(notifications);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Ошибка загрузки уведомлений" });
     }
   });
 
