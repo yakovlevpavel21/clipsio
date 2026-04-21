@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import api from '../api';
+import api from '../../api';
 import { X, Calendar, Clock, User, Save, Loader2 } from 'lucide-react';
-import HourlyPicker from '../components/HourlyPicker';
+import HourlyPicker from '../HourlyPicker';
 
 export default function EditTaskModal({ task, creators, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);

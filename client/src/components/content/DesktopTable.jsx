@@ -1,7 +1,7 @@
 import { memo, useState, useEffect } from 'react';
 import {
   Play, Download, MoreVertical, PlayCircle, ExternalLink,
-  Trash2, Edit3, Send, UploadCloud, User as UserIcon
+  Trash2, Edit3, Send, Clock, UploadCloud, User as UserIcon
 } from 'lucide-react';
 import api from '../../api';
 import { StatusBadge, DateInfo, VideoThumbnail } from './Helpers';
@@ -10,7 +10,8 @@ import { Link } from 'react-router-dom';
 const DesktopTable = ({
   tasks, user, isManager, isAdmin, highlightedId, lastElementRef,
   setUploadTarget, setEditTarget, setPublishTarget, setActivePreview,
-  loadData, handleDownload, activeDropdownId, setActiveDropdownId
+  loadData, handleDownload, activeDropdownId, setActiveDropdownId,
+  setHistoryTarget
 }) => {
 
   const formatDuration = (s) => {
@@ -92,50 +93,59 @@ const DesktopTable = ({
 
             // 2. ЛОГИКА ВЫПАДАЮЩЕГО МЕНЮ
             const actions = [
-            // ГРУППА 1: ОРИГИНАЛЬНЫЙ РОЛИК
-            { 
-              id: 'p_orig', label: 'Воспроизвести оригинал', icon: <Play size={16}/>, 
-              disabled: !hasOriginal,
-              onClick: () => setActivePreview({ url: `/${task.originalVideo.filePath}`, title: task.originalVideo.title, channel: task.channel.name }) 
-            },
-            { 
-              id: 'yt_orig', label: 'Оригинал на YouTube', icon: <ExternalLink size={16}/>, 
-              onClick: () => window.open(task.originalVideo.url, '_blank') 
-            },
-            { 
-              id: 'dl_orig', label: 'Скачать оригинал', icon: <Download size={16}/>, 
-              disabled: !hasOriginal, 
-              onClick: () => handleDownload(task, 'original') 
-            },
+              // ГРУППА 1: ОРИГИНАЛЬНЫЙ РОЛИК
+              { 
+                id: 'p_orig', label: 'Воспроизвести оригинал', icon: <Play size={16}/>, 
+                disabled: !hasOriginal,
+                onClick: () => setActivePreview({ url: `/${task.originalVideo.filePath}`, title: task.originalVideo.title, channel: task.channel.name }) 
+              },
+              { 
+                id: 'yt_orig', label: 'Оригинал на YouTube', icon: <ExternalLink size={16}/>, 
+                onClick: () => window.open(task.originalVideo.url, '_blank') 
+              },
+              { 
+                id: 'dl_orig', label: 'Скачать оригинал', icon: <Download size={16}/>, 
+                disabled: !hasOriginal, 
+                onClick: () => handleDownload(task, 'original') 
+              },
 
-            { type: 'divider' }, // РАЗДЕЛИТЕЛЬ
+              { type: 'divider' }, // РАЗДЕЛИТЕЛЬ
 
-            // ГРУППА 2: РЕЗУЛЬТАТ (РЕАКЦИЯ)
-            { 
-              id: 'p_react', label: 'Воспроизвести результат', icon: <Play size={16} />, 
-              disabled: !hasReaction,
-              onClick: () => setActivePreview({ url: `/${task.reactionFilePath}`, title: task.originalVideo.title, channel: task.channel.name }) 
-            },
-            { 
-              id: 'yt_res', label: 'Результат на YouTube', icon: <ExternalLink size={16} />, 
-              disabled: !isPub || !task.youtubeUrl,
-              onClick: () => window.open(task.youtubeUrl, '_blank') 
-            },
-            { 
-              id: 'dl_react', label: 'Скачать результат', icon: <Download size={16} />, 
-              disabled: !hasReaction, 
-              onClick: () => handleDownload(task, 'reaction') 
-            },
-          ];
+              // ГРУППА 2: РЕЗУЛЬТАТ (РЕАКЦИЯ)
+              { 
+                id: 'p_react', label: 'Воспроизвести результат', icon: <Play size={16} />, 
+                disabled: !hasReaction,
+                onClick: () => setActivePreview({ url: `/${task.reactionFilePath}`, title: task.originalVideo.title, channel: task.channel.name }) 
+              },
+              { 
+                id: 'yt_res', label: 'Результат на YouTube', icon: <ExternalLink size={16} />, 
+                disabled: !isPub || !task.youtubeUrl,
+                onClick: () => window.open(task.youtubeUrl, '_blank') 
+              },
+              { 
+                id: 'dl_react', label: 'Скачать результат', icon: <Download size={16} />, 
+                disabled: !hasReaction, 
+                onClick: () => handleDownload(task, 'reaction') 
+              },
 
-          // ГРУППА 3: УПРАВЛЕНИЕ (только для менеджеров)
-          if (isMyManagedTask) {
-              actions.push({ type: 'divider' });
-              if (!isPub) {
-                actions.push({ id: 'edit', label: 'Настройки задачи', icon: <Edit3 size={16} />, onClick: () => setEditTarget(task) });
-              }
-              actions.push({ id: 'del', label: 'Удалить задачу', icon: <Trash2 size={16} className="text-red-500" />, color: 'text-red-500', onClick: () => { if(confirm("Удалить?")) api.delete(`/api/tasks/${task.id}`).then(() => loadData(0, true)) } });
-          }
+              { type: 'divider' }, // РАЗДЕЛИТЕЛЬ
+
+              { 
+                id: 'history', 
+                label: 'История событий', 
+                icon: <Clock size={16}/>, 
+                onClick: () => setHistoryTarget(task) 
+              },
+            ];
+
+            // ГРУППА 3: УПРАВЛЕНИЕ (только для менеджеров)
+            if (isMyManagedTask) {
+                actions.push({ type: 'divider' });
+                if (!isPub) {
+                  actions.push({ id: 'edit', label: 'Настройки задачи', icon: <Edit3 size={16} />, onClick: () => setEditTarget(task) });
+                }
+                actions.push({ id: 'del', label: 'Удалить задачу', icon: <Trash2 size={16} className="text-red-500" />, color: 'text-red-500', onClick: () => { if(confirm("Удалить?")) api.delete(`/api/tasks/${task.id}`).then(() => loadData(0, true)) } });
+            }
 
             return (
               <tr

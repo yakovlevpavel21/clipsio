@@ -5,6 +5,7 @@ const fs = require('fs');
 const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
+const cleanupOldFiles = require('./cleanup');
 
 const prisma = require('./db');
 
@@ -71,6 +72,15 @@ setInterval(async () => {
     }).catch(() => {});
   }
 }, 60000);
+
+// Запускать очистку каждые 24 часа
+// 1000мс * 60с * 60м * 24ч
+setInterval(() => {
+  cleanupOldFiles();
+}, 24 * 60 * 60 * 1000);
+
+// Опционально: запустить один раз сразу при старте сервера
+cleanupOldFiles();
 
 // ПОДКЛЮЧЕНИЕ РОУТОВ
 app.use('/api/auth', require('./routes/auth'));

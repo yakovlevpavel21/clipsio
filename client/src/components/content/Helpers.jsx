@@ -83,14 +83,19 @@ export function StatusBadge({ task }) {
 }
 
 export function DateInfo({ task }) {
-  const dateToDisplay = task.status === 'PUBLISHED' ? task.publishedAt : (task.deadline || task.createdAt);
+  // Логика: если опубликовано — показываем scheduledAt (план выхода)
+  // Если нет — показываем deadline (когда должен сдать креатор)
+  const isPub = task.status === 'PUBLISHED';
+  const dateToDisplay = isPub ? task.scheduledAt : (task.deadline || task.createdAt);
+  
   if (!dateToDisplay) return <span className="text-[11px] text-slate-500">---</span>;
 
   const d = new Date(dateToDisplay);
   const formattedDate = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   const formattedTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const isOverdue = task.status !== 'PUBLISHED' && task.deadline && new Date(task.deadline) < new Date();
+  // Проверка просрочки: если еще НЕ опубликовано и дедлайн уже прошел
+  const isOverdue = !isPub && task.deadline && new Date(task.deadline) < new Date();
 
   return (
     <span className={`text-[13px] min-[1150px]:text-[11px] whitespace-nowrap font-medium ${

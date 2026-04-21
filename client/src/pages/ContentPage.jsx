@@ -9,12 +9,13 @@ import FilterBar from '../components/content/FilterBar';
 import DesktopTable from '../components/content/DesktopTable';
 import MobileList from '../components/content/MobileList';
 import BottomSheet from '../components/content/BottomSheet';
+import TaskHistoryModal from '../components/content/TaskHistoryModal';
 
 // Модалки
 import UploadModal from '../components/UploadModal';
 import VideoModal from '../components/VideoModal';
 import AddTaskModal from '../components/AddTaskModal';
-import EditTaskModal from '../components/EditTaskModal';
+import EditTaskModal from '../components/content/EditTaskModal';
 import PublishModal from '../components/PublishModal';
 
 export default function ContentPage() {
@@ -42,6 +43,7 @@ export default function ContentPage() {
   const [publishTarget, setPublishTarget] = useState(null);
   const [activePreview, setActivePreview] = useState(null);
   const [bottomSheetTask, setBottomSheetTask] = useState(null);
+  const [historyTarget, setHistoryTarget] = useState(null);
 
   const isAdmin = user?.role === 'ADMIN';
   const isManager = user?.role === 'MANAGER' || isAdmin;
@@ -75,25 +77,30 @@ export default function ContentPage() {
   const location = useLocation();
 
   useEffect(() => {
-    // Проверяем, есть ли в состоянии перехода ID задачи
+    // 1. Берем ID задачи из стейта перехода
     const taskId = location.state?.scrollToTaskId;
     
+    // 2. Если ID есть и список задач уже загружен
     if (taskId && tasks.length > 0) {
-      // Небольшая задержка, чтобы данные успели отрисоваться
       const timer = setTimeout(() => {
         const element = document.getElementById(`task-${taskId}`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          
-          // Визуальный эффект: подсвечиваем задачу на 3 секунды
           setHighlightedId(taskId);
+          
+          // --- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ---
+          // Очищаем state в истории браузера. 
+          // Теперь location.state.scrollToTaskId станет undefined.
+          // При следующих обновлениях списка (через сокеты) этот эффект больше не сработает.
+          navigate(location.pathname, { replace: true, state: {} });
+          
           setTimeout(() => setHighlightedId(null), 3000);
         }
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [location.state, tasks]);
+  }, [location.state?.scrollToTaskId, tasks.length > 0]);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -190,20 +197,18 @@ export default function ContentPage() {
       if (!isRelevant) return;
 
       setTasks(prev => {
-        // 1. Обновляем или добавляем задачу в массив
         const exists = prev.find(t => t.id === updatedTask.id);
         const updatedList = exists 
           ? prev.map(t => t.id === updatedTask.id ? updatedTask : t)
           : [updatedTask, ...prev];
 
-        // 2. АВТОМАТИЧЕСКАЯ СОРТИРОВКА (как на бэкенде)
+        // Сортировка должна полностью повторять логику бэкенда
         return [...updatedList].sort((a, b) => {
-          // Берем дату публикации, если её нет — дату создания
+          // Приоритет: запланированная дата, если нет - дата создания
           const timeA = new Date(a.scheduledAt || a.createdAt).getTime();
           const timeB = new Date(b.scheduledAt || b.createdAt).getTime();
           
-          // Сортировка по убыванию (сначала новые)
-          return timeB - timeA;
+          return timeB - timeA; // Сначала новые/будущие
         });
       });
 
@@ -298,6 +303,7 @@ export default function ContentPage() {
                 setUploadTarget={setUploadTarget} setEditTarget={setEditTarget}
                 setPublishTarget={setPublishTarget} setActivePreview={setActivePreview}
                 handleDownload={handleDownload} lastElementRef={lastElementRef}
+                setHistoryTarget={setHistoryTarget}
               />
             </div>
             <div className="block min-[850px]:hidden">
@@ -319,7 +325,7 @@ export default function ContentPage() {
           <BottomSheet 
             task={bottomSheetTask} isManager={isManager} onClose={() => setBottomSheetTask(null)}
             setActivePreview={setActivePreview} setEditTarget={setEditTarget}
-            loadData={loadData} handleDownload={handleDownload}
+            loadData={loadData} handleDownload={handleDownload} setHistoryTarget={setHistoryTarget}
           />
         )}
       </AnimatePresence>
@@ -330,6 +336,7 @@ export default function ContentPage() {
       {publishTarget && <PublishModal task={publishTarget} onClose={() => setPublishTarget(null)} onSuccess={() => { setPublishTarget(null); loadData(0, true); }} />}
       {activePreview && <VideoModal {...activePreview} onClose={() => setActivePreview(null)} />}
       {uploadTarget && <UploadModal task={uploadTarget} onClose={() => setUploadTarget(null)} onSuccess={() => { setUploadTarget(null); loadData(0, true); }} />}
+      {historyTarget && <TaskHistoryModal task={historyTarget} onClose={() => setHistoryTarget(null)} />}
     </div>
   );
 }

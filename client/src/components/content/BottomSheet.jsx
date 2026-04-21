@@ -1,9 +1,9 @@
 import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Download, ExternalLink, Edit3, Trash2, PlayCircle } from 'lucide-react';
+import { Play, Download, ExternalLink, Edit3, Trash2, Clock, PlayCircle } from 'lucide-react';
 import api from '../../api';
 
-const BottomSheet = ({ task, isManager, onClose, setActivePreview, setEditTarget, loadData, handleDownload }) => {
+const BottomSheet = ({ task, isManager, onClose, setActivePreview, setEditTarget, loadData, handleDownload, setHistoryTarget }) => {
   const isPublished = task.status === 'PUBLISHED';
   const hasOriginal = !!task.originalFileExists;
   const hasReaction = !!task.reactionFileExists;
@@ -60,6 +60,14 @@ const BottomSheet = ({ task, isManager, onClose, setActivePreview, setEditTarget
               disabled={!hasReaction}
               icon={<Download size={18}/>} label="Скачать файл" 
               onClick={() => { handleDownload(task, 'reaction'); onClose(); }} 
+            />
+
+            <div className="h-px bg-slate-100 dark:bg-[#333333] my-2 mx-2" />
+            
+            <MobileMenuBtn 
+              icon={<Clock size={18}/>} 
+              label="История событий" 
+              onClick={() => { setHistoryTarget(task); onClose(); }} 
             />
 
             {isManager && (

@@ -66,7 +66,12 @@ module.exports = (io) => {
           channel: true, 
           creator: { select: { id: true, username: true } } 
         },
-        orderBy: [ { scheduledAt: 'desc' }, { createdAt: 'desc' } ],
+        // Сортируем по плану публикации (новые/будущие сверху)
+        // Если плана нет, используем дату создания как запасной вариант
+        orderBy: [
+          { scheduledAt: 'desc' },
+          { createdAt: 'desc' }
+        ],
         skip: parseInt(skip),
         take: parseInt(take)
       });
@@ -210,23 +215,49 @@ module.exports = (io) => {
   router.post('/:id/upload', protect, upload.single('video'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Файл не получен" });
+
       const fullTask = await prisma.task.update({
         where: { id: parseInt(req.params.id) },
-        data: { status: 'REACTION_UPLOADED', reactionFilePath: req.file.path.replace(/\\/g, '/'), reactionUploadedAt: new Date(), needsFixing: false },
+        data: { 
+          status: 'REACTION_UPLOADED', 
+          reactionFilePath: req.file.path.replace(/\\/g, '/'), 
+          reactionUploadedAt: new Date(), 
+          needsFixing: false 
+        },
+        // Убеждаемся, что managerId и данные канала подгружены
         include: { originalVideo: true, channel: true, creator: true, manager: true }
       });
+
       io.emit('task_updated', appendFileStatus(fullTask));
 
-      const staff = await prisma.user.findMany({ where: { role: { in: ['MANAGER', 'ADMIN'] } }, select: { id: true } });
-      for (const s of staff) {
+      // УВЕДОМЛЕНИЕ ТОЛЬКО ОТВЕТСТВЕННОМУ МЕНЕДЖЕРУ
+      if (fullTask.managerId) {
+        const targetId = fullTask.managerId;
+
         await prisma.notification.create({
-          data: { userId: s.id, taskId: fullTask.id, title: "Реакция готова ✅", message: `${req.user.username} сдал(а) видео по каналу ${fullTask.channel.name}`, type: "REACTION_UPLOADED" }
+          data: { 
+            userId: targetId, 
+            taskId: fullTask.id, 
+            title: "Реакция готова ✅", 
+            message: `${req.user.username} сдал(а) видео по каналу ${fullTask.channel.name}`, 
+            type: "REACTION_UPLOADED" 
+          }
         });
-        io.to(`user_${s.id}`).emit('new_notification');
-        sendPushNotification(s.id, { title: "Реакция готова ✅", message: fullTask.channel.name });
+
+        // Шлем сигнал в персональную комнату менеджера
+        io.to(`user_${targetId}`).emit('new_notification');
+        
+        // Пуш-уведомление на телефон
+        sendPushNotification(targetId, { 
+          title: "Реакция готова ✅", 
+          message: `${fullTask.channel.name}: видео от ${req.user.username}` 
+        });
       }
+
       res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Отклонение (Reject)
@@ -259,11 +290,11 @@ module.exports = (io) => {
       });
       io.emit('task_updated', appendFileStatus(fullTask));
       if (fullTask.creatorId) {
-        await prisma.notification.create({
-          data: { userId: fullTask.creatorId, taskId: fullTask.id, title: "Опубликовано! 🎉", message: `Видео для канала ${fullTask.channel.name} успешно вышло`, type: "PUBLISHED" }
-        });
-        io.to(`user_${fullTask.creatorId}`).emit('new_notification');
-        sendPushNotification(fullTask.creatorId, { title: "Опубликовано!", message: fullTask.channel.name });
+        //await prisma.notification.create({
+        //  data: { userId: fullTask.creatorId, taskId: fullTask.id, title: "Опубликовано! 🎉", message: `Видео для канала ${fullTask.channel.name} успешно вышло`, type: "PUBLISHED" }
+        //});
+        //io.to(`user_${fullTask.creatorId}`).emit('new_notification');
+        //sendPushNotification(fullTask.creatorId, { title: "Опубликовано!", message: fullTask.channel.name });
       }
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
