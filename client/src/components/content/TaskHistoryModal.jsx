@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { X, Clock, Plus, UploadCloud, CheckCircle2, Calendar, Target, AlertCircle, Check } from 'lucide-react';
+import { X, Clock, Zap, Plus, UploadCloud, CheckCircle2, Calendar, Target, AlertCircle, Check } from 'lucide-react';
 import { VideoThumbnail } from './Helpers';
 
 export default function TaskHistoryModal({ task, onClose }) {
@@ -24,6 +24,15 @@ export default function TaskHistoryModal({ task, onClose }) {
       color: 'text-blue-500',
       bg: 'bg-blue-500/10',
       description: 'Ролик добавлен в систему'
+    },
+    {
+      id: 'claimed',
+      label: 'Принято в работу',
+      date: task.claimedAt,
+      icon: <Zap size={16} />,
+      color: 'text-amber-500',
+      bg: 'bg-amber-500/10',
+      description: 'Креатор подтвердил начало выполнения'
     },
     {
       id: 'uploaded',

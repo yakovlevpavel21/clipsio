@@ -188,7 +188,7 @@ module.exports = (io) => {
             channelId: parseInt(t.channelId),
             managerId: parseInt(req.user.id),
             creatorId: t.creatorId ? parseInt(t.creatorId) : null,
-            status: t.creatorId ? 'IN_PROGRESS' : 'AWAITING_REACTION',
+            status: 'AWAITING_REACTION',
             deadline: t.deadline ? new Date(t.deadline) : null,
             scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null,
           },
@@ -298,6 +298,26 @@ module.exports = (io) => {
       }
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  router.post('/:id/claim', protect, authorize('CREATOR', 'ADMIN'), async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      
+      const task = await prisma.task.update({
+        where: { id: taskId },
+        data: {
+          status: 'IN_PROGRESS',
+          claimedAt: new Date(),
+        },
+        include: { originalVideo: true, channel: true, creator: true }
+      });
+
+      io.emit('task_updated', appendFileStatus(task));
+      res.json(appendFileStatus(task));
+    } catch (err) {
+      res.status(500).json({ error: "Не удалось взять задачу в работу" });
+    }
   });
 
   // Редактирование (Patch)

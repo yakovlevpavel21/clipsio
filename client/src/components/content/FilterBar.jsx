@@ -58,6 +58,7 @@ const FilterBar = ({ filters, setFilters, channels, creators, isManager, onAddTa
           onChange={(v) => setFilters(f => ({...f, status: v}))}
           options={[
             {id: 'all', name: 'Все статусы'},
+            {id: 'AWAITING_REACTION', name: 'Новые'}, // ДОБАВЛЕНО
             {id: 'IN_PROGRESS', name: 'В работе'},
             {id: 'REACTION_UPLOADED', name: 'На проверке'},
             {id: 'FIXING', name: 'Нужны правки'},

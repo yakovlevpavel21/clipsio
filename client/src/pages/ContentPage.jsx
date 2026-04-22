@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import api, { socket, getDownloadUrl } from '../api';
 import { Loader2, Plus, Layers, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useLocation } from 'react-router-dom';
+import  {useNavigate, useLocation } from 'react-router-dom';
 
 // Компоненты
 import FilterBar from '../components/content/FilterBar';
@@ -33,6 +33,7 @@ export default function ContentPage() {
   const [highlightedId, setHighlightedId] = useState(null);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [error, setError] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Стейты для Pull-to-Refresh
   const [pullDistance, setPullDistance] = useState(0);
@@ -50,6 +51,10 @@ export default function ContentPage() {
   const isAdmin = user?.role === 'ADMIN';
   const isManager = user?.role === 'MANAGER' || isAdmin;
   const observer = useRef();
+
+  const navigate = useNavigate(); 
+  const location = useLocation();
+  const highlightTimerRef = useRef(null);
 
   const loadData = async (skip = 0, reset = false) => {
     if (reset && tasks.length === 0) setIsInitialLoading(true);
@@ -69,6 +74,19 @@ export default function ContentPage() {
     }
   };
 
+  const triggerHighlight = (id) => {
+    // Очищаем старый таймер, если он был
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    
+    setHighlightedId(id);
+    
+    // Убираем через 3 секунды
+    highlightTimerRef.current = setTimeout(() => {
+      setHighlightedId(null);
+      highlightTimerRef.current = null;
+    }, 3000);
+  };
+
   useEffect(() => { loadData(0, true); }, [filters]);
   
   useEffect(() => { 
@@ -76,33 +94,38 @@ export default function ContentPage() {
     if (isManager) api.get('/api/tasks/creators').then(res => setCreators(res.data));
   }, [isManager]);
 
-  const location = useLocation();
-
+  // 2. Эффект скролла из уведомлений
   useEffect(() => {
-    // 1. Берем ID задачи из стейта перехода
-    const taskId = location.state?.scrollToTaskId;
+    const targetTaskId = location.state?.scrollToTaskId;
     
-    // 2. Если ID есть и список задач уже загружен
-    if (taskId && tasks.length > 0) {
-      const timer = setTimeout(() => {
-        const element = document.getElementById(`task-${taskId}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setHighlightedId(taskId);
-          
-          // --- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ---
-          // Очищаем state в истории браузера. 
-          // Теперь location.state.scrollToTaskId станет undefined.
-          // При следующих обновлениях списка (через сокеты) этот эффект больше не сработает.
-          navigate(location.pathname, { replace: true, state: {} });
-          
-          setTimeout(() => setHighlightedId(null), 3000);
-        }
-      }, 500);
+    // Если нет ID или данные еще загружаются — выходим
+    if (!targetTaskId || isInitialLoading || tasks.length === 0) return;
+
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const tryScroll = () => {
+      const element = document.getElementById(`task-${targetTaskId}`);
       
-      return () => clearTimeout(timer);
-    }
-  }, [location.state?.scrollToTaskId, tasks.length > 0]);
+      if (element) {
+        // 1. Скроллим
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // 2. Подсвечиваем
+        triggerHighlight(targetTaskId);
+        
+        // 3. Очищаем состояние навигации ТУТ, когда всё успешно сработало
+        navigate(location.pathname, { replace: true, state: {} });
+      } else if (attempts < maxAttempts) {
+        // Если элемента еще нет в DOM, пробуем еще раз через 100мс
+        attempts++;
+        setTimeout(tryScroll, 100);
+      }
+    };
+
+    tryScroll();
+
+  }, [location.state?.scrollToTaskId, isInitialLoading, tasks.length]);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -158,41 +181,72 @@ export default function ContentPage() {
   };
 
   const handleDownload = async (task, type = 'original') => {
-    // Выбираем путь в зависимости от типа
     const path = type === 'original' ? task.originalVideo?.filePath : task.reactionFilePath;
     if (!path) return alert("Файл не найден");
     
-    // Формируем имя файла для сохранения
-    const suffix = type === 'original' ? 'original' : 'result';
-    const videoFileName = `${task.originalVideo.videoId}_${suffix}.mp4`;
-    
+    const videoFileName = `${task.originalVideo.videoId}_${type}.mp4`;
     const url = window.location.origin + getDownloadUrl(path, videoFileName);
     
-    const isStandalone = window.navigator.standalone;
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
 
-    if (isStandalone && isIOS && navigator.share) {
+    // Если это iPhone и приложение запущено как PWA (на рабочем столе)
+    if (isIOS && isStandalone) {
+      setIsDownloading(true);
+      
+      // Пытаемся вызвать нативный Share Sheet (самый удобный способ)
       try {
-        const response = await fetch(url);
+        // Ставим лимит на ожидание загрузки (например, 4 секунды)
+        // Если файл качается дольше, iOS может заблокировать окно "Поделиться"
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
         const blob = await response.blob();
         const file = new File([blob], videoFileName, { type: 'video/mp4' });
-        await navigator.share({ files: [file] });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+          setIsDownloading(false);
+          return; // Если успешно поделились — выходим
+        }
       } catch (err) {
-        if (err.name !== 'AbortError') window.open(url, '_blank');
+        console.log("Share sheet failed or timeout, falling back to Browser View");
+      }
+
+      // --- ФОЛЛБЕК ДЛЯ ПОЯВЛЕНИЯ КНОПОК БРАУЗЕРА ---
+      // Если Share Sheet не сработал или файл слишком большой
+      setIsDownloading(false);
+
+      // Хитрость: window.open с параметром 'noreferrer' и '_blank' 
+      // в PWA на iOS часто вызывает именно In-App Safari с кнопками "Готово" и панелью навигации
+      const win = window.open(url, '_blank', 'noreferrer');
+      
+      // Если всплывающее окно заблокировано
+      if (!win) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noreferrer';
+        link.click();
       }
     } else {
-      const link = document.body.appendChild(document.createElement('a'));
+      // Обычная логика для Android и ПК
+      const link = document.createElement('a');
       link.href = url;
       link.download = videoFileName;
+      document.body.appendChild(link);
       link.click();
-      link.remove();
+      document.body.removeChild(link);
     }
   };
 
+  // 3. Обновление через сокеты
   useEffect(() => {
     const handleTaskUpdate = (updatedTask) => {
-      const isRelevant = 
-        isAdmin || 
+      const isRelevant = isAdmin || 
         (user.role === 'MANAGER' && updatedTask.managerId === user.id) || 
         (user.role === 'CREATOR' && updatedTask.creatorId === user.id);
 
@@ -204,22 +258,22 @@ export default function ContentPage() {
           ? prev.map(t => t.id === updatedTask.id ? updatedTask : t)
           : [updatedTask, ...prev];
 
-        // Сортировка должна полностью повторять логику бэкенда
         return [...updatedList].sort((a, b) => {
-          // Приоритет: запланированная дата, если нет - дата создания
           const timeA = new Date(a.scheduledAt || a.createdAt).getTime();
           const timeB = new Date(b.scheduledAt || b.createdAt).getTime();
-          
-          return timeB - timeA; // Сначала новые/будущие
+          return timeB - timeA;
         });
       });
 
-      setHighlightedId(updatedTask.id);
-      setTimeout(() => setHighlightedId(null), 3000);
+      // Включаем подсветку для обновленной задачи
+      triggerHighlight(updatedTask.id);
     };
 
     socket.on('task_updated', handleTaskUpdate);
-    return () => socket.off('task_updated');
+    return () => {
+      socket.off('task_updated');
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    };
   }, [user.id, isAdmin]);
 
   const lastElementRef = useCallback(node => {
@@ -316,10 +370,11 @@ export default function ContentPage() {
             </div>
             <div className="block min-[850px]:hidden">
               <MobileList 
-                tasks={tasks} isManager={isManager} highlightedId={highlightedId}
+                tasks={tasks} user={user} isManager={isManager} highlightedId={highlightedId}
                 setUploadTarget={setUploadTarget} setEditTarget={setEditTarget}
                 setPublishTarget={setPublishTarget} setBottomSheetTask={setBottomSheetTask}
                 setActivePreview={setActivePreview} lastElementRef={lastElementRef}
+                handleDownload={handleDownload}
               />
             </div>
           </div>
@@ -335,6 +390,23 @@ export default function ContentPage() {
             setActivePreview={setActivePreview} setEditTarget={setEditTarget}
             loadData={loadData} handleDownload={handleDownload} setHistoryTarget={setHistoryTarget}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isDownloading && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white"
+          >
+            <div className="bg-[#282828] p-8 rounded-3xl flex flex-col items-center gap-4 shadow-2xl border border-white/10">
+              <Loader2 className="animate-spin text-blue-500" size={40} />
+              <div className="text-center">
+                <p className="font-bold uppercase tracking-widest text-xs">Подготовка файла</p>
+                <p className="text-[10px] text-white/40 mt-1 uppercase">Это может занять несколько секунд...</p>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

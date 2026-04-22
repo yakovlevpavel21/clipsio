@@ -58,10 +58,23 @@ const DesktopTable = ({
             const isReady = task.status === 'REACTION_UPLOADED' || isPub;
             const isMyManagedTask = isAdmin || (user.role === 'MANAGER' && task.managerId === user.id);
             const isLastItems = index >= tasks.length - 3 && tasks.length > 5;
+            const isNewTask = task.status === 'AWAITING_REACTION' && task.creatorId === user.id;
 
             // 1. ЛОГИКА ГЛАВНОЙ КНОПКИ (140px)
             let primaryBtn = null;
-            if (isPub) {
+            if (isNewTask) {
+              primaryBtn = (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    api.post(`/api/tasks/${task.id}/claim`).then(() => handleDownload(task, 'original'));
+                  }} 
+                  className="w-full h-8 flex items-center justify-center gap-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-black uppercase transition-all shadow-lg"
+                >
+                  <Download size={14} /> <span>Начать работу</span>
+                </button>
+              );
+            } else if (isPub) {
               primaryBtn = (
                 <button onClick={() => window.open(task.youtubeUrl, '_blank')} className="w-full h-8 flex items-center justify-center gap-1.5 px-3 border border-slate-200 dark:border-[#444444] hover:bg-slate-100 dark:hover:bg-[#333333] text-slate-700 dark:text-[#f1f1f1] rounded text-[10px] font-black uppercase transition-all">
                   <PlayCircle size={14} className="text-emerald-500" /> <span>РЕЗУЛЬТАТ</span>
@@ -148,11 +161,16 @@ const DesktopTable = ({
             }
 
             return (
-              <tr
-                key={task.id}
-                id={`task-${task.id}`}
-                ref={index === tasks.length - 1 ? lastElementRef : null}
-                className={`transition-colors duration-75 ${task.id === highlightedId ? 'bg-blue-500/10' : 'hover:bg-slate-50/80 dark:hover:bg-[#2a2a2a]'}`}
+              <tr 
+                key={task.id} 
+                id={`task-${task.id}`} // ID должен быть строго на теге <tr>
+                className={`
+                  transition-all duration-500
+                  ${task.id === highlightedId 
+                    ? 'bg-blue-500/20 ring-2 ring-inset ring-blue-500/50 shadow-lg' // Усилили для ПК
+                    : 'hover:bg-slate-50/80 dark:hover:bg-[#2a2a2a]'
+                  }
+                `}
               >
                 <td className="p-4 pl-8">
                   <div className="flex items-start gap-5">

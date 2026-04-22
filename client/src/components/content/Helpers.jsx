@@ -1,4 +1,4 @@
-import { Clock, CheckCircle2, AlertCircle, Zap, List, Info, Film, ImageOff } from 'lucide-react';
+import { Clock, CheckCircle2, AlertCircle, Zap, List, Info, Film, ImageOff, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 // Иконки (для мобилок и Dashboards)
@@ -6,6 +6,9 @@ export function StatusIcon({ task, size = 16 }) {
   if (task.status === 'PUBLISHED') return <CheckCircle2 size={size} className="text-emerald-500" />;
   if (task.needsFixing) return <AlertCircle size={size} className="text-red-500 animate-pulse" />;
   if (task.status === 'REACTION_UPLOADED') return <Clock size={size} className="text-blue-500" />;
+  if (task.status === 'AWAITING_REACTION' && task.creatorId) {
+    return <Sparkles size={size} className="text-indigo-500 dark:text-indigo-400" />;
+  }
   if (task.status === 'IN_PROGRESS') return <Zap size={size} className="text-amber-500" />;
   return <List size={size} className="text-slate-400" />;
 }
@@ -20,6 +23,16 @@ export function StatusBadge({ task }) {
       <span className="truncate">{config.label}</span>
     </div>
   );
+
+  if (task.status === 'AWAITING_REACTION' && task.creatorId) {
+    return renderBadge({
+      label: 'Новое задание',
+      icon: Sparkles,
+      bg: 'bg-indigo-50 dark:bg-indigo-500/10',
+      text: 'text-indigo-600 dark:text-indigo-400',
+      border: 'border-indigo-100 dark:border-indigo-500/20'
+    });
+  }
 
   if (task.status === 'PUBLISHED') {
     return renderBadge({
